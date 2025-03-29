@@ -1,0 +1,1 @@
+Checks: cppcoreguidelines-*, bugprone-*, performance-*, -*magic-numbers*, -*pro-type-vararg, -*easily-swappable*
