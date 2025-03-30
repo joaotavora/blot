@@ -4,9 +4,16 @@
 #include <regex>
 #include <unordered_map>
 #include <unordered_set>
+#include <list>
+#include <print>
+
+using line_t = std::string;
+using input_t = std::list<line_t>;
+using label_t = std::string;
+using linum_t = size_t;
 
 auto slurp(std::istream& is) {
-  std::vector<std::string> v;
+  input_t v;
   std::string s{};
   while (true) {
     if (!std::getline(is, s)) break;
@@ -23,56 +30,55 @@ struct user_options {
   bool preserve_unused_labels{false};
 };
 
-void sweeping(std::vector<std::string>& input, const user_options& o, auto fn) {
+void sweeping(input_t& input, const user_options& o, auto fn) {
   for (auto it = input.begin();;) {
     std::smatch matches;
-    struct eof {};
+
     bool done{false};
-    size_t linum{1};
+    size_t linum{0};
     
 
-    try {
-      auto preserve = [&]() {
-        ++it;
-        done = true;
-        // std::cerr << "Preserving: " << *it << "\n";
-      };
-      auto kill = [&]() {
-        auto old = it;
-        ++it;
-        done = true;
-        // std::cerr << "Killing: " << *it << "\n";
-        input.erase(old);
-      };
-      auto match = [&](auto&& re, const std::smatch** out_matches) -> bool {
-        auto& l = *it;
-        linum++;
-        if (it == input.end()) throw eof{};
-        if (std::regex_match(l, matches, re)) {
-          if (out_matches) *out_matches = &matches;
-          return true;
-        } else
-          return false;
-      };
-      auto asm_linum = [&]() -> size_t { return linum; };
+    auto preserve = [&](const char* reason="") {
+      std::println(stderr, "Preserve: {} '{}'", reason, *it);
+      linum++;
+      ++it;
+      done = true;
+    };
+    auto kill = [&](const char* reason="") {
+      std::println(stderr, "Kill: {} '{}'", reason, *it);
+      auto old = it;
+      ++it;
+      input.erase(old);
+      done = true;
+    };
 
-      fn(preserve, kill, match, it, asm_linum);
-      if (!done) {
-        if (o.preserve_directives)
-          preserve();
-        else
-          kill();
-      }
-    } catch (eof& i) {
+    auto match = [&](auto&& re,
+                     const std::smatch** out_matches, int from = 0) -> bool {
+      if (std::regex_search(it->cbegin()+from, it->cend(), matches, re)) {
+        if (out_matches) *out_matches = &matches;
+        return true;
+      } else
+        return false;
+    };
+    auto asm_linum = [&]() -> size_t { return linum; };
+
+    if (it == input.end()) {
+      std::println(stderr, "EOF");
       break;
+    }
+    if (!it->size()) { kill("(empty)"); continue; }
+    fn(preserve, kill, match, it, asm_linum);
+    if (!done) {
+      if (o.preserve_directives)
+        preserve("(default)");
+      else {
+        kill("(default)");
+      }
     }
   }
 }
 
-using input_t = std::vector<std::string>;
-using line_t = std::string;
-using label_t = std::string;
-using linum_t = size_t;
+
 
 // clang-format off
 const std::regex r_label_start                {R"(^([^:]+): *(?:#|$)(?:.*))"};
@@ -89,7 +95,7 @@ const std::regex r_data_defn                  {R"(^[[:space:]]*\.(string|asciz|a
 // clang-format on
 
 struct parser_state {
-  std::unordered_map<line_t, std::vector<label_t>> routines;
+  std::unordered_map<label_t, std::vector<label_t>> routines;
   std::optional<label_t> current_routine{};
   std::optional<label_t> main_file_tag{};
   std::vector<label_t> main_file_routines{};
@@ -110,42 +116,54 @@ void first_pass(
   sweeping(input, o, [&](auto preserve, auto kill, auto match_1, auto it, auto) {
     const std::smatch* matches{};
 
-    auto match = [&](auto&& re) { return match_1(re, &matches); };
-
-    if ((*it)[0] != '\t') {
+    auto match = [&](auto&& re, int from = 0) { return match_1(re, &matches, from); };
+    if (it->at(0) != '\t') {
       if ((match(r_label_start))) {
-        if (!s.routines.contains(matches->str(1)))
+        std::println(stderr, "FP1.1 '{}'", *it);
+        if (s.routines.contains(matches->str(1))) {
+          std::println(stderr, "FP1.1.1 '{}'", *it);
           s.current_routine = matches->str(1);
-        preserve();
+        }
+        preserve("FP1.1");
       } else {
-        kill();
+        kill("FP1.1");
       }
     } else {
       if (s.current_routine && match(r_has_opcode)) {
-        while (match(r_label_reference))
+        std::println(stderr, "FP2.1 '{}'", *it);
+        auto offset = matches->length(0);
+        while (match(r_label_reference, offset)) {
+          std::println(stderr, "FP2.1.1 '{}'", *it);
           s.routines[*s.current_routine].push_back(matches->str(0));
-        preserve();
+          offset += matches->length(0);
+        }
+        preserve("FP2.1");
       } else if (!o.preserve_comments && match(r_comment_only)) {
-        kill();
+        kill("FP2.2");
       } else if (
-          match(r_defines_global) || match(r_defines_function_or_object)) {
+                 match(r_defines_global) || match(r_defines_function_or_object)) {
+        std::println(stderr, "FP2.3 '{}'", *it);
         s.routines[matches->str(1)] = {};
       } else if (
           match(r_source_file_hint) &&
           main_file_name ==
-              (matches->length(3) ? matches->str(3) : matches->str(2))) {
+            (matches->length(3) ? matches->str(3) : matches->str(2))) {
+        std::println(stderr, "FP2.4 '{}'", *it);
         s.main_file_tag = matches->str(1);
       } else if (match(r_source_tag)) {
+        std::println(stderr, "FP2.5 '{}'", *it);
         if (s.current_routine && s.main_file_tag &&
-            matches->str(1) == s.main_file_tag) {
+          matches->str(1) == s.main_file_tag) {
+          std::println(stderr, "FP2.5.1 '{}'", *it);
           s.main_file_routines.push_back(*s.current_routine);
-          preserve();
         }
+        preserve("FP2.5");
       } else if (match(r_endblock)) {
+        std::println(stderr, "FP2.6 '{}'", *it);
         s.current_routine = std::nullopt;
-        preserve();
+        preserve("FP2.6");
       } else {
-        preserve();
+        preserve("FP2.7");
       }
     }
   });
@@ -171,37 +189,44 @@ void intermediate(parser_state& s, const user_options& o) {
 }
 
 void second_pass(input_t& input, parser_state& s, const user_options& o) {
+  std::optional<label_t> reachable_label{};
+  std::optional<size_t> source_linum{};
+
   sweeping(input, o, [&](auto preserve, auto kill, auto match_1, auto it, auto asm_linum) {
     const std::smatch* matches{};
 
     auto match = [&](auto&& re) { return match_1(re, &matches); };
 
-    std::optional<label_t> reachable_label{};
-    std::optional<size_t> source_linum{};
-
-    if ((*it)[0] != '\t') {
+    if (it->at(0) != '\t') {
       if ((match(r_label_start))) {
+        std::println(stderr, "SP1.1 '{}'", *it);
         label_t l = matches->str(1);
         if (s.used_labels.contains(l)) {
           reachable_label = l;
-          preserve();
+          preserve("SP1.1.1");
         } else if (o.preserve_unused_labels) {
-          preserve();
+          preserve("SP1.1.2");
         } else {
-          kill();
+          kill("SP1.1.3");
         }
       }
     } else {
       if (match(r_data_defn) && reachable_label) {
-        preserve();
+        preserve("SP2.1");
       } else if (match(r_has_opcode) && reachable_label) {
-        if (source_linum) s.register_mapping(*source_linum, asm_linum());
-        preserve();
+        if (source_linum) {
+          s.register_mapping(*source_linum, asm_linum());
+          std::println(stderr, "SP2.2.1 '{}'", *it);
+        }
+        preserve("SP2.2");
       } else if (match(r_source_tag)) {
+        std::println(stderr, "SP2.3 '{}'", *it);
         source_linum = 42; //bogus
       } else if (match(r_source_stab)) {
+        std::println(stderr, "SP2.4 '{}'", *it);
         source_linum = std::nullopt; //bogus
       } else if (match(r_endblock)) {
+        std::println(stderr, "SP2.5 '{}'", *it);
         reachable_label = std::nullopt;
       }
     }
