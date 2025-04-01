@@ -93,7 +93,7 @@ struct parser_state {
   std::unordered_map<label_t, std::vector<label_t>> routines;
   std::optional<label_t> current_routine{};
   std::optional<label_t> main_file_tag{};
-  std::vector<label_t> main_file_routines{};
+  std::unordered_set<label_t> main_file_routines{};
   std::unordered_set<label_t> used_labels{};
 
   std::unordered_map<linum_t, std::vector<linum_t>> line_mappings{};
@@ -154,7 +154,7 @@ void first_pass(
         if (s.current_routine && s.main_file_tag &&
           matches->str(1) == s.main_file_tag) {
           LOG_TRACE("FP2.5.1 '{}'", *it);
-          s.main_file_routines.push_back(*s.current_routine);
+          s.main_file_routines.insert(*s.current_routine);
         }
         LOG_TRACE("Preserve: FP2.5 '{}'", *it);
         preserve();
@@ -172,20 +172,15 @@ void first_pass(
 }
 
 void intermediate(parser_state& s, const user_options& o) {
-  //highly fishy
-  std::vector<label_t> interesting_routines;
   if (o.preserve_library_functions) {
-    interesting_routines.reserve(s.routines.size());
-    for (auto&& [label, callees] : s.routines)
-      interesting_routines.push_back(label);
+    for (auto&& [label, callees] : s.routines) {
+      s.used_labels.insert(label);
+      for (auto&& callee : callees) { s.used_labels.insert(callee); }
+    }
   } else {
-    interesting_routines = s.main_file_routines;
-  }
-  for (auto&& label : interesting_routines) {
-    s.used_labels.insert(label);
-
-    for (auto&& callee : s.routines[label]) {
-      s.used_labels.insert(callee);
+    for (auto&& label : s.main_file_routines) {
+      s.used_labels.insert(label);
+      for (auto&& callee : s.routines[label]) { s.used_labels.insert(callee); }
     }
   }
 }
@@ -243,7 +238,7 @@ void second_pass(input_t& input, parser_state& s, const user_options& o) {
 int main() {
   auto input = slurp(std::cin);
 
-  logger::set_level(logger::level::trace);
+  logger::set_level(logger::level::debug);
 
   parser_state state{};
   user_options options{};
