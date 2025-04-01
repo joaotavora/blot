@@ -1,3 +1,5 @@
+#include "logger.hpp"
+
 #include <iostream>
 #include <istream>
 #include <optional>
@@ -36,16 +38,13 @@ void sweeping(input_t& input, const user_options& o, auto fn) {
 
     bool done{false};
     size_t linum{0};
-    
 
-    auto preserve = [&](const char* reason="") {
-      std::println(stderr, "Preserve: {} '{}'", reason, *it);
+    auto preserve = [&]() {
       linum++;
       ++it;
       done = true;
     };
-    auto kill = [&](const char* reason="") {
-      std::println(stderr, "Kill: {} '{}'", reason, *it);
+    auto kill = [&]() {
       auto old = it;
       ++it;
       input.erase(old);
@@ -63,17 +62,13 @@ void sweeping(input_t& input, const user_options& o, auto fn) {
     auto asm_linum = [&]() -> size_t { return linum; };
 
     if (it == input.end()) {
-      std::println(stderr, "EOF");
+      LOG_TRACE("EOF");
       break;
     }
-    if (!it->size()) { kill("(empty)"); continue; }
+    if (!it->size()) { kill(); continue; }
     fn(preserve, kill, match, it, asm_linum);
     if (!done) {
-      if (o.preserve_directives)
-        preserve("(default)");
-      else {
-        kill("(default)");
-      }
+      if (o.preserve_directives) preserve(); else kill();
     }
   }
 }
@@ -119,51 +114,58 @@ void first_pass(
     auto match = [&](auto&& re, int from = 0) { return match_1(re, &matches, from); };
     if (it->at(0) != '\t') {
       if ((match(r_label_start))) {
-        std::println(stderr, "FP1.1 '{}'", *it);
+        LOG_TRACE("FP1.1 '{}'", *it);
         if (s.routines.contains(matches->str(1))) {
-          std::println(stderr, "FP1.1.1 '{}'", *it);
+          LOG_TRACE("FP1.1.1 '{}'", *it);
           s.current_routine = matches->str(1);
         }
-        preserve("FP1.1");
+        LOG_TRACE("Preserve: FP1.1 '{}'", *it);
+        preserve();
       } else {
-        kill("FP1.1");
+        LOG_TRACE("Kill: FP1.1 '{}'", *it);
+        kill();
       }
     } else {
       if (s.current_routine && match(r_has_opcode)) {
-        std::println(stderr, "FP2.1 '{}'", *it);
+        LOG_TRACE("FP2.1 '{}'", *it);
         auto offset = matches->length(0);
         while (match(r_label_reference, offset)) {
-          std::println(stderr, "FP2.1.1 '{}'", *it);
+          LOG_TRACE("FP2.1.1 '{}'", *it);
           s.routines[*s.current_routine].push_back(matches->str(0));
           offset += matches->length(0);
         }
-        preserve("FP2.1");
+        LOG_TRACE("Preserve: FP2.1 '{}'", *it);
+        preserve();
       } else if (!o.preserve_comments && match(r_comment_only)) {
-        kill("FP2.2");
+        LOG_TRACE("Kill: FP2.2 '{}'", *it);
+        kill();
       } else if (
                  match(r_defines_global) || match(r_defines_function_or_object)) {
-        std::println(stderr, "FP2.3 '{}'", *it);
+        LOG_TRACE("FP2.3 '{}'", *it);
         s.routines[matches->str(1)] = {};
       } else if (
           match(r_source_file_hint) &&
           main_file_name ==
             (matches->length(3) ? matches->str(3) : matches->str(2))) {
-        std::println(stderr, "FP2.4 '{}'", *it);
+        LOG_TRACE("FP2.4 '{}'", *it);
         s.main_file_tag = matches->str(1);
       } else if (match(r_source_tag)) {
-        std::println(stderr, "FP2.5 '{}'", *it);
+        LOG_TRACE("FP2.5 '{}'", *it);
         if (s.current_routine && s.main_file_tag &&
           matches->str(1) == s.main_file_tag) {
-          std::println(stderr, "FP2.5.1 '{}'", *it);
+          LOG_TRACE("FP2.5.1 '{}'", *it);
           s.main_file_routines.push_back(*s.current_routine);
         }
-        preserve("FP2.5");
+        LOG_TRACE("Preserve: FP2.5 '{}'", *it);
+        preserve();
       } else if (match(r_endblock)) {
-        std::println(stderr, "FP2.6 '{}'", *it);
+        LOG_TRACE("FP2.6 '{}'", *it);
         s.current_routine = std::nullopt;
-        preserve("FP2.6");
+        LOG_TRACE("Preserve: FP2.6 '{}'", *it);
+        preserve();
       } else {
-        preserve("FP2.7");
+        LOG_TRACE("Preserve: FP2.7 '{}'", *it);
+        preserve();
       }
     }
   });
@@ -199,34 +201,39 @@ void second_pass(input_t& input, parser_state& s, const user_options& o) {
 
     if (it->at(0) != '\t') {
       if ((match(r_label_start))) {
-        std::println(stderr, "SP1.1 '{}'", *it);
+        LOG_TRACE("SP1.1 '{}'", *it);
         label_t l = matches->str(1);
         if (s.used_labels.contains(l)) {
           reachable_label = l;
-          preserve("SP1.1.1");
+          LOG_TRACE("Preserve: SP1.1.1 '{}'", *it);
+          preserve();
         } else if (o.preserve_unused_labels) {
-          preserve("SP1.1.2");
+          LOG_TRACE("Preserve: SP1.1.2 '{}'", *it);
+          preserve();
         } else {
-          kill("SP1.1.3");
+          LOG_TRACE("Kill: SP1.1.3 '{}'", *it);
+          kill();
         }
       }
     } else {
       if (match(r_data_defn) && reachable_label) {
-        preserve("SP2.1");
+        LOG_TRACE("Preserve: SP2.1 '{}'", *it);
+        preserve();
       } else if (match(r_has_opcode) && reachable_label) {
         if (source_linum) {
           s.register_mapping(*source_linum, asm_linum());
-          std::println(stderr, "SP2.2.1 '{}'", *it);
+          LOG_TRACE("SP2.2.1 '{}'", *it);
         }
-        preserve("SP2.2");
+        LOG_TRACE("Preserve: SP2.2 '{}'", *it);
+        preserve();
       } else if (match(r_source_tag)) {
-        std::println(stderr, "SP2.3 '{}'", *it);
+        LOG_TRACE("SP2.3 '{}'", *it);
         source_linum = 42; //bogus
       } else if (match(r_source_stab)) {
-        std::println(stderr, "SP2.4 '{}'", *it);
+        LOG_TRACE("SP2.4 '{}'", *it);
         source_linum = std::nullopt; //bogus
       } else if (match(r_endblock)) {
-        std::println(stderr, "SP2.5 '{}'", *it);
+        LOG_TRACE("SP2.5 '{}'", *it);
         reachable_label = std::nullopt;
       }
     }
@@ -235,6 +242,8 @@ void second_pass(input_t& input, parser_state& s, const user_options& o) {
 
 int main() {
   auto input = slurp(std::cin);
+
+  logger::set_level(logger::level::trace);
 
   parser_state state{};
   user_options options{};
@@ -245,3 +254,4 @@ int main() {
 
   for (auto&& l : input) std::cout << l << "\n";
 }
+ 
