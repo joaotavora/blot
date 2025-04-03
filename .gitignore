@@ -1,4 +1,7 @@
-build
+build*
 .cache
 hello.s
+gmon.out
+perf.data*
+flamegraph.html
 
