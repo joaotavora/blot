@@ -255,7 +255,7 @@ void second_pass(input_t& input, parser_state& s, const user_options& o) {
 int main() {
   auto input = slurp(std::cin);
 
-  logger::set_level(logger::level::debug);
+  xpto::logger::set_level(xpto::logger::level::debug);
 
   parser_state state{};
   user_options options{};

@@ -8,9 +8,9 @@
 #include <string>
 #include <string_view>
 
-namespace logger {
+namespace xpto::logger {
 
-enum class level : uint8_t { trace, debug, info, warning, error, fatal, none };
+enum class level : uint8_t { fatal, error, warning, info, debug, trace };
 
 inline std::string_view level_to_string(level level) {
   // clang-format off
@@ -44,7 +44,7 @@ template <typename... Args>
 inline void log(
     level level, const std::source_location& location,
     std::format_string<Args...> fmt, Args&&... args) {
-  if (level < global_level) return;
+  if (level > global_level) return;
 
   std::println(
       "{} {}:{} {}: {}", get_current_timestamp(), location.file_name(),
@@ -52,29 +52,35 @@ inline void log(
       std::format(fmt, std::forward<Args>(args)...));
 }
 
-}  // namespace logger
+}  // namespace xpto::logger
 
 // NOLINTBEGIN
-#define LOG_TRACE(...) \
-  logger::log(         \
-      logger::level::trace, std::source_location::current(), __VA_ARGS__)
+#define LOG_TRACE(...)                                             \
+  xpto::logger::log(                                               \
+      xpto::logger::level::trace, std::source_location::current(), \
+      __VA_ARGS__)
 
-#define LOG_DEBUG(...) \
-  logger::log(         \
-      logger::level::debug, std::source_location::current(), __VA_ARGS__)
+#define LOG_DEBUG(...)                                             \
+  xpto::logger::log(                                               \
+      xpto::logger::level::debug, std::source_location::current(), \
+      __VA_ARGS__)
 
 #define LOG_INFO(...) \
-  logger::log(logger::level::info, std::source_location::current(), __VA_ARGS__)
+  xpto::logger::log(  \
+      xpto::logger::level::info, std::source_location::current(), __VA_ARGS__)
 
-#define LOG_WARN(...) \
-  logger::log(        \
-      logger::level::warning, std::source_location::current(), __VA_ARGS__)
+#define LOG_WARN(...)                                                \
+  xpto::logger::log(                                                 \
+      xpto::logger::level::warning, std::source_location::current(), \
+      __VA_ARGS__)
 
-#define LOG_ERROR(...) \
-  logger::log(         \
-      logger::level::error, std::source_location::current(), __VA_ARGS__)
+#define LOG_ERROR(...)                                             \
+  xpto::logger::log(                                               \
+      xpto::logger::level::error, std::source_location::current(), \
+      __VA_ARGS__)
 
-#define LOG_FATAL(...) \
-  logger::log(         \
-      logger::level::fatal, std::source_location::current(), __VA_ARGS__)
+#define LOG_FATAL(...)                                             \
+  xpto::logger::log(                                               \
+      xpto::logger::level::fatal, std::source_location::current(), \
+      __VA_ARGS__)
 // NOLINTEND
