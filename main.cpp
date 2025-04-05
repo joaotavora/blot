@@ -1,10 +1,12 @@
 #include "logger.hpp"
+#include "linespan.hpp"
 
 #include <re2/re2.h>
 
 #include <array>
 #include <iostream>
 #include <istream>
+#include <iterator>
 #include <optional>
 #include <unordered_map>
 #include <unordered_set>
@@ -12,13 +14,13 @@
 #include <print>
 
 using line_t = std::string;
-using input_t = std::list<line_t>;
+using input_t = xpto::linespan;
 using label_t = std::string;
 using linum_t = size_t;
 using matches_t = std::array<std::string, 10>;
 
 auto slurp(std::istream& is) {
-  input_t v;
+  std::list<line_t> v;
   std::string s{};
   while (true) {
     if (!std::getline(is, s)) break;
@@ -47,7 +49,10 @@ constexpr auto make_pointer_array(std::array<T, N>& values) {
 }
 } // namespace utils
 
-void sweeping(input_t& input, const user_options& o, auto fn) {
+template <typename Output, typename Input, typename F>
+[[nodiscard]] Output sweeping(const Input& input, const user_options& o, F fn) {
+
+  Output retval{};
 
   matches_t  matches;
   auto match_ptrs = utils::make_pointer_array<const RE2::Arg>(matches);
@@ -59,13 +64,13 @@ void sweeping(input_t& input, const user_options& o, auto fn) {
 
     auto preserve = [&]() {
       linum++;
+      retval.push_back(*it);
       ++it;
       done = true;
     };
     auto kill = [&]() {
       auto old = it;
       ++it;
-      input.erase(old);
       done = true;
     };
 
@@ -91,6 +96,7 @@ void sweeping(input_t& input, const user_options& o, auto fn) {
       if (o.preserve_directives) preserve(); else kill();
     }
   }
+  return retval;
 }
 
 // clang-format off
@@ -121,12 +127,14 @@ struct parser_state {
   }
 };
 
-void first_pass(
-    input_t& input, const std::string& main_file_name, parser_state& s,
+auto first_pass(
+    const auto& input, const std::string& main_file_name, parser_state& s,
     const user_options& o) {
 
+  using output_t = std::vector<typename std::decay_t<decltype(input)>::value_type>;
+
   const matches_t* matches{};
-  sweeping(input, o, [&](auto preserve, auto kill, auto match_1, auto it, auto) {
+  return sweeping<output_t>(input, o, [&](auto preserve, auto kill, auto match_1, auto it, auto) {
 
     auto match = [&](auto&& re, int from = 0) { return match_1(re, &matches, from); };
     if (it->at(0) != '\t') {
@@ -202,11 +210,13 @@ void intermediate(parser_state& s, const user_options& o) {
   }
 }
 
-void second_pass(input_t& input, parser_state& s, const user_options& o) {
+auto second_pass(const auto& input, parser_state& s, const user_options& o) {
   std::optional<label_t> reachable_label{};
   std::optional<size_t> source_linum{};
 
-  sweeping(input, o, [&](auto preserve, auto kill, auto match_1, auto it, auto asm_linum) {
+  using output_t = std::vector<typename std::decay_t<decltype(input)>::value_type>;
+
+  return sweeping<output_t>(input, o, [&](auto preserve, auto kill, auto match_1, auto it, auto asm_linum) {
     const matches_t* matches{};
 
     auto match = [&](auto&& re) { return match_1(re, &matches); };
@@ -253,17 +263,20 @@ void second_pass(input_t& input, parser_state& s, const user_options& o) {
 }
 
 int main() {
-  auto input = slurp(std::cin);
+  std::vector<char> buf{std::istreambuf_iterator<char>{std::cin},
+                        std::istreambuf_iterator<char>()};
+  // auto input = slurp(std::cin);
+  auto input = xpto::linespan{buf};
 
   xpto::logger::set_level(xpto::logger::level::debug);
 
   parser_state state{};
   user_options options{};
 
-  first_pass(input, "<stdin>", state, options);
+  auto fp_output = first_pass(input, "<stdin>", state, options);
   intermediate(state, options);
-  second_pass(input, state, options);
+  auto sp_output = second_pass(fp_output, state, options);
 
-  for (auto&& l : input) std::cout << l << "\n";
+  for (auto&& l : sp_output) std::cout << l << "\n";
 }
  
