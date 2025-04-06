@@ -186,6 +186,8 @@ auto first_pass(
 }
 
 void intermediate(parser_state& s, const user_options& o) {
+  if (!s.main_file_tag)
+    throw std::runtime_error("Cannot proceed without a 'main_file_tag'");
   if (o.preserve_library_functions) {
     for (auto&& [label, callees] : s.routines) {
       s.used_labels.insert(label);
@@ -252,6 +254,7 @@ auto second_pass(const auto& input, parser_state& s, const user_options& o) {
 }
 
 int main() {
+  try {
   std::vector<char> buf{std::istreambuf_iterator<char>{std::cin},
                         std::istreambuf_iterator<char>()};
   // auto input = slurp(std::cin);
@@ -267,5 +270,8 @@ int main() {
   auto sp_output = second_pass(fp_output, state, options);
 
   for (auto&& l : sp_output) std::cout << l << "\n";
+  } catch (std::exception& e) {
+    LOG_FATAL("Whoops {}", e.what());
+  } 
 }
  
