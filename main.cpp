@@ -4,30 +4,20 @@
 #include <re2/re2.h>
 
 #include <array>
+#include <exception>
 #include <iostream>
-#include <istream>
 #include <iterator>
 #include <optional>
+#include <stdexcept>
 #include <unordered_map>
 #include <unordered_set>
-#include <list>
 #include <print>
 
-using line_t = std::string;
 using input_t = xpto::linespan;
-using label_t = std::string;
+using match_t = std::string_view;
+using matches_t = std::span<match_t>;
+using label_t = std::string_view;
 using linum_t = size_t;
-using matches_t = std::array<std::string, 10>;
-
-auto slurp(std::istream& is) {
-  std::list<line_t> v;
-  std::string s{};
-  while (true) {
-    if (!std::getline(is, s)) break;
-    v.push_back(std::move(s));
-  }
-  return v;
-}
 
 // user options
 struct user_options {
@@ -54,7 +44,7 @@ template <typename Output, typename Input, typename F>
 
   Output retval{};
 
-  matches_t  matches;
+  std::array<match_t, 10> matches;
   auto match_ptrs = utils::make_pointer_array<const RE2::Arg>(matches);
   auto arg_ptrs = utils::make_pointer_array<const RE2::Arg* const>(match_ptrs);
 
@@ -74,12 +64,11 @@ template <typename Output, typename Input, typename F>
       done = true;
     };
 
-    auto match = [&](auto&& re,
-                     const matches_t** out_matches, int from = 0) -> bool {
-      std::string_view a(it->cbegin() + from, it->cend());
+    auto match = [&](auto&& re, matches_t& out_matches, int from = 0) -> bool {
+      match_t a(it->cbegin() + from, it->cend());
       if (RE2::PartialMatchN(a, re, &arg_ptrs.at(1), re.NumberOfCapturingGroups())) {
         matches[0] = a;
-        if (out_matches) *out_matches = &matches;
+        out_matches = matches_t(matches.begin(), re.NumberOfCapturingGroups());
         return true;
       } else
         return false;
@@ -133,16 +122,16 @@ auto first_pass(
 
   using output_t = std::vector<typename std::decay_t<decltype(input)>::value_type>;
 
-  const matches_t* matches{};
+  matches_t matches{};
   return sweeping<output_t>(input, o, [&](auto preserve, auto kill, auto match_1, auto it, auto) {
 
-    auto match = [&](auto&& re, int from = 0) { return match_1(re, &matches, from); };
+    auto match = [&](auto&& re, int from = 0) { return match_1(re, matches, from); };
     if (it->at(0) != '\t') {
       if ((match(r_label_start))) {
         LOG_TRACE("FP1.1 '{}'", *it);
-        if (s.routines.contains(matches->at(1))) {
+        if (s.routines.contains(matches[1])) {
           LOG_TRACE("FP1.1.1 '{}'", *it);
-          s.current_routine = matches->at(1);
+          s.current_routine = matches[1];
         }
         LOG_TRACE("Preserve: FP1.1 '{}'", *it);
         preserve();
@@ -153,11 +142,11 @@ auto first_pass(
     } else {
       if (s.current_routine && match(r_has_opcode)) {
         LOG_TRACE("FP2.1 '{}'", *it);
-        auto offset = matches->at(0).size();
+        auto offset = matches[0].size();
         while (match(r_label_reference, offset)) {
           LOG_TRACE("FP2.1.1 '{}'", *it);
-          s.routines[*s.current_routine].push_back(matches->at(0));
-          offset += matches->at(0).size();
+          s.routines[*s.current_routine].push_back(matches[0]);
+          offset += matches[0].size();
         }
         LOG_TRACE("Preserve: FP2.1 '{}'", *it);
         preserve();
@@ -167,17 +156,17 @@ auto first_pass(
       } else if (
                  match(r_defines_global) || match(r_defines_function_or_object)) {
         LOG_TRACE("FP2.3 '{}'", *it);
-        s.routines[matches->at(1)] = {};
+        s.routines[matches[1]] = {};
       } else if (
           match(r_source_file_hint) &&
           main_file_name ==
-            (matches->at(3).size() ? matches->at(3) : matches->at(2))) {
+            (matches[3].size() ? matches[3] : matches[2])) {
         LOG_TRACE("FP2.4 '{}'", *it);
-        s.main_file_tag = matches->at(1);
+        s.main_file_tag = matches[1];
       } else if (match(r_source_tag)) {
         LOG_TRACE("FP2.5 '{}'", *it);
         if (s.current_routine && s.main_file_tag &&
-          matches->at(1) == s.main_file_tag) {
+          matches[1] == s.main_file_tag) {
           LOG_TRACE("FP2.5.1 '{}'", *it);
           s.main_file_routines.insert(*s.current_routine);
         }
@@ -217,14 +206,14 @@ auto second_pass(const auto& input, parser_state& s, const user_options& o) {
   using output_t = std::vector<typename std::decay_t<decltype(input)>::value_type>;
 
   return sweeping<output_t>(input, o, [&](auto preserve, auto kill, auto match_1, auto it, auto asm_linum) {
-    const matches_t* matches{};
 
-    auto match = [&](auto&& re) { return match_1(re, &matches); };
+    matches_t matches{};
+    auto match = [&](auto&& re) { return match_1(re, matches); };
 
     if (it->at(0) != '\t') {
       if ((match(r_label_start))) {
         LOG_TRACE("SP1.1 '{}'", *it);
-        label_t l = matches->at(1);
+        label_t l = matches[1];
         if (s.used_labels.contains(l)) {
           reachable_label = l;
           LOG_TRACE("Preserve: SP1.1.1 '{}'", *it);
