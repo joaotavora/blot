@@ -37,12 +37,23 @@ template<typename Dest, typename T, size_t N>
 constexpr auto make_pointer_array(std::array<T, N>& values) {
   return make_pointer_array_impl<Dest>(values, std::make_index_sequence<N>{});
 }
+
+std::optional<size_t> to_size_t(std::string_view sv) {
+  size_t result{};
+  auto [ptr, ec] = std::from_chars(sv.begin(), sv.end(), result);
+  if (ec == std::errc{} && ptr == sv.end())
+    return result;
+  else
+    return std::nullopt;
+}
+
 } // namespace utils
 
 template <typename Output, typename Input, typename F>
 [[nodiscard]] Output sweeping(const Input& input, const user_options& o, F fn) {
 
   Output retval{};
+  size_t linum{1};
 
   std::array<match_t, 10> matches;
   auto match_ptrs = utils::make_pointer_array<const RE2::Arg>(matches);
@@ -50,7 +61,6 @@ template <typename Output, typename Input, typename F>
 
   for (auto it = input.begin();;) {
     bool done{false};
-    size_t linum{0};
 
     auto preserve = [&]() {
       linum++;
@@ -241,10 +251,32 @@ auto second_pass(const auto& input, parser_state& s, const user_options& o) {
         preserve();
       } else if (match(r_source_tag)) {
         LOG_TRACE("SP2.3 '{}'", *it);
-        source_linum = 42; //bogus
+        source_linum = [&]() -> std::optional<int> {
+          if (*s.main_file_tag == matches[1]) {
+            return utils::to_size_t(matches[2]);
+          } else {
+            return std::nullopt;
+          }
+        }();
       } else if (match(r_source_stab)) {
         LOG_TRACE("SP2.4 '{}'", *it);
-        source_linum = std::nullopt; //bogus
+        // http://www.math.utah.edu/docs/info/stabs_11.html
+        // 68     0x44     N_SLINE   line number in text segment
+        // 100    0x64     N_SO      path and name of source file 
+        // 132    0x84     N_SOL     Name of sub-source (#include) file.
+        auto a = utils::to_size_t(matches[1]);
+        if (a) {
+          switch (a.value()) {
+          case 68:
+            source_linum = utils::to_size_t(matches[2]);
+            break;
+          case 100:
+          case 132:
+            source_linum = std::nullopt;
+            break;
+          default: {}
+          }
+        }
       } else if (match(r_endblock)) {
         LOG_TRACE("SP2.5 '{}'", *it);
         reachable_label = std::nullopt;
@@ -270,8 +302,8 @@ int main() {
   auto sp_output = second_pass(fp_output, state, options);
 
   for (auto&& l : sp_output) std::cout << l << "\n";
+
   } catch (std::exception& e) {
     LOG_FATAL("Whoops {}", e.what());
-  } 
+  }
 }
- 
