@@ -119,6 +119,7 @@ const RE2 r_comment_only               {R"(^[[:space:]]*(?:[#;@]|//|/\*.*\*/).*$
 const RE2 r_label_reference            {R"(\.[A-Z_a-z][$.0-9A-Z_a-z]*)"};
 const RE2 r_defines_global             {R"(^[[:space:]]*\.globa?l[[:space:]]*([.A-Z_a-z][$.0-9A-Z_a-z]*))"};
 const RE2 r_defines_function_or_object {R"(^[[:space:]]*\.type[[:space:]]*(.*),[[:space:]]*[%@])"};
+const RE2 r_main_file_name             {R"(^[[:space:]]*\.file[[:space:]]+\"([^\"]+)\"$)"};
 const RE2 r_source_file_hint           {R"(^[[:space:]]*\.file[[:space:]]+([[:digit:]]+)[[:space:]]+\"([^\"]+)\"(?:[[:space:]]+\"([^\"]+)\")?.*)"};
 const RE2 r_source_tag                 {R"(^[[:space:]]*\.loc[[:space:]]+([[:digit:]]+)[[:space:]]+([[:digit:]]+).*)"};
 const RE2 r_source_stab                {R"(^.*\.stabn[[:space:]]+([[:digit:]]+),0,([[:digit:]]+),.*)"};
@@ -130,6 +131,7 @@ struct parser_state {
   std::unordered_map<label_t, std::vector<label_t>> routines;
   std::optional<label_t> current_routine{};
   std::optional<label_t> main_file_tag{};
+  std::optional<std::string> main_file_name{};
   std::unordered_set<label_t> main_file_routines{};
   std::unordered_set<label_t> used_labels{};
 
@@ -141,10 +143,10 @@ struct parser_state {
 };
 
 auto first_pass(
-    const auto& input, const std::string& main_file_name, parser_state& s,
-    const user_options& options) {
+                const auto& input, parser_state& s,
+                const user_options& options) {
   using output_t =
-      std::vector<typename std::decay_t<decltype(input)>::value_type>;
+    std::vector<typename std::decay_t<decltype(input)>::value_type>;
   output_t output;
 
   matches_t matches{};
@@ -182,18 +184,36 @@ auto first_pass(
             LOG_TRACE("Kill: FP2.2 '{}'", *it);
             kill();
           } else if (
-              match(r_defines_global) || match(r_defines_function_or_object)) {
+                     match(r_defines_global) || match(r_defines_function_or_object)) {
             LOG_TRACE("FP2.3 '{}'", *it);
             s.routines[matches[1]] = {};
-          } else if (
-              match(r_source_file_hint) &&
-              main_file_name == (matches[3].size() ? matches[3] : matches[2])) {
+          } else if (match(r_source_file_hint)) {
             LOG_TRACE("FP2.4 '{}'", *it);
-            s.main_file_tag = matches[1];
+            // Horrible heuristic accounts for four cases
+            //
+            // cat test/test01.cpp | clang++ --std=c++23 -S -g -x c++ - -o -
+            // cat test/test01.cpp | g++ --std=c++23 -S -g -x c++ - -o -
+            // clang++ --std=c++23 -S -g test/test01.cpp -o -
+            // gcc++ --std=c++23 -S -g test/test01.cpp -o -
+            //
+            // All of these produce slightly different '.file'
+            // directives, and the following code tries to guess
+            // accordingly.
+            if (!s.main_file_name && matches[3].size()) {
+              s.main_file_name = matches[3]=="-"?"<stdin>":matches[3];
+              s.main_file_tag = matches[1];
+              LOG_DEBUG("FP2.4.1 set main_file_name={} and main_file_tag={}",
+                  *s.main_file_name, *s.main_file_tag);
+            }
+            if (s.main_file_name && !matches[3].size() && *s.main_file_name == matches[2]) {
+              LOG_DEBUG("FP2.4.2 updated main_file_tag={}",
+                  *s.main_file_tag);
+              s.main_file_tag = matches[1];
+            }
           } else if (match(r_source_tag)) {
             LOG_TRACE("FP2.5 '{}'", *it);
             if (s.current_routine && s.main_file_tag &&
-                matches[1] == s.main_file_tag) {
+              matches[1] == s.main_file_tag) {
               LOG_TRACE("FP2.5.1 '{}'", *it);
               s.main_file_routines.insert(*s.current_routine);
             }
@@ -367,7 +387,7 @@ int main(int argc, char* argv[]) {
   auto input = xpto::linespan{buf};
 
   try {
-    auto fp_output = first_pass(input, "<stdin>", state, options);
+    auto fp_output = first_pass(input, state, options);
     intermediate(state, options);
     auto sp_output = second_pass(fp_output, state, options);
 
