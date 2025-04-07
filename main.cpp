@@ -1,8 +1,13 @@
 #include <re2/re2.h>
 
 #include <array>
+#include <boost/json.hpp>
+#include <boost/program_options.hpp>
+#include <boost/program_options/value_semantic.hpp>
 #include <exception>
 #include <iostream>
+#include <istream>
+#include <fstream>
 #include <iterator>
 #include <optional>
 #include <print>
@@ -23,10 +28,12 @@ using linum_t = size_t;
 
 // user options
 struct user_options {
-  bool preserve_directives{false};
-  bool preserve_comments{false};
-  bool preserve_library_functions{false};
-  bool preserve_unused_labels{false};
+  bool preserve_directives{};
+  bool preserve_comments{};
+  bool preserve_library_functions{};
+  bool preserve_unused_labels{};
+  std::string file_in{};
+  int loglevel;
 };
 
 namespace utils {
@@ -307,14 +314,57 @@ auto second_pass(
 }
 }  // namespace xpto
 
-int main() {
-  xpto::logger::set_level(xpto::logger::level::debug);
-  std::vector<char> buf{
-    std::istreambuf_iterator<char>{std::cin}, std::istreambuf_iterator<char>()};
-  auto input = xpto::linespan{buf};
+namespace po = boost::program_options;
+namespace json = boost::json;
 
+int main(int argc, char* argv[]) {
   xpto::parser_state state{};
   xpto::user_options options{};
+
+  // clang-format off
+  po::options_description desc("Allowed options");
+  desc.add_options()
+    ("help", "show this help")
+    ("preserve-directives,pd",
+        po::bool_switch(&options.preserve_directives)->default_value(false),
+        "preserve all non-comment assembly directives")
+    ("preserve-comments,pc",
+        po::bool_switch(&options.preserve_comments)->default_value(false),
+        "preserve comments")
+    ("preserve-library-functions,pl",
+        po::bool_switch(&options.preserve_library_functions)->default_value(false),
+        "preserve library functions")
+    ("preserve-unused-labels,pu",
+        po::bool_switch(&options.preserve_unused_labels)->default_value(false),
+        "preserve unused labels")
+    ("d", po::value<int>(&options.loglevel)->default_value(
+        static_cast<int>(xpto::logger::level::info)
+        ),
+        "Debug log level (default 3==INFO)")
+    ("in",
+        po::value<std::string>(&options.file_in),
+        "Read assembly from file ARG.  '-' for stdin.")
+    ;
+  // clang-format on
+
+  po::variables_map vm;
+  po::store(po::parse_command_line(argc, argv, desc), vm);
+  po::notify(vm);
+
+  xpto::logger::set_level(static_cast<xpto::logger::level>(options.loglevel));
+
+  if (vm.count("help")) {
+    desc.print(std::cout);
+    return 1;
+  }
+
+  std::ifstream file_stream;
+  std::istream& input_stream = (options.file_in == "-") ?
+      std::cin :
+      (file_stream.open(options.file_in), file_stream);
+  std::vector<char> buf{
+    std::istreambuf_iterator<char>{input_stream}, std::istreambuf_iterator<char>()};
+  auto input = xpto::linespan{buf};
 
   try {
     auto fp_output = first_pass(input, "<stdin>", state, options);
