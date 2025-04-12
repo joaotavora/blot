@@ -15,7 +15,8 @@ endif()
 
 find_package(Boost REQUIRED COMPONENTS program_options)
 
-add_executable(bolt_exe main.cpp)
+file(GLOB sources CONFIGURE_DEPENDS src/bolt/*.cpp)
+add_executable(bolt_exe ${sources})
 target_include_directories(bolt_exe PRIVATE include)
 target_link_libraries(bolt_exe PRIVATE
   re2::re2

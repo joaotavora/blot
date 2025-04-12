@@ -1,3 +1,5 @@
+#pragma once
+
 #include "linespan.hpp"
 #include "logger.hpp"
 
@@ -15,7 +17,6 @@
 
 namespace xpto::bolt {
 
-// user options
 struct generation_options {
   bool preserve_directives{};
   bool preserve_comments{};
@@ -42,7 +43,7 @@ constexpr auto make_pointer_array(std::array<T, N>& values) {
   return make_pointer_array_impl<Dest>(values, std::make_index_sequence<N>{});
 }
 
-std::optional<size_t> to_size_t(std::string_view sv) {
+inline std::optional<size_t> to_size_t(std::string_view sv) {
   size_t result{};
   auto [ptr, ec] = std::from_chars(sv.begin(), sv.end(), result);
   if (ec == std::errc{} && ptr == sv.end())
@@ -230,7 +231,7 @@ auto first_pass(
   return output;
 }
 
-void intermediate(parser_state& s, const generation_options& o) {
+inline void intermediate(parser_state& s, const generation_options& o) {
   if (!s.main_file_tag)
     throw std::runtime_error("Cannot proceed without a 'main_file_tag'");
   if (o.preserve_library_functions) {
@@ -332,10 +333,12 @@ auto second_pass(
 
 } // namespace detail
 
-auto annotate(const auto& input, const generation_options& options) {
+inline auto annotate(std::span<const char> input, const generation_options& options) {
+
+  xpto::linespan lspan{input};
   detail::parser_state state{};
 
-  auto fp_output = detail::first_pass(input, state, options);
+  auto fp_output = detail::first_pass(lspan, state, options);
   detail::intermediate(state, options);
   return detail:: second_pass(fp_output, state, options);
 }
