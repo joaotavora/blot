@@ -16,6 +16,7 @@ endif()
 find_package(Boost REQUIRED COMPONENTS program_options)
 
 add_executable(bolt_exe main.cpp)
+target_include_directories(bolt_exe PRIVATE include)
 target_link_libraries(bolt_exe PRIVATE
   re2::re2
   Boost::headers
@@ -25,7 +26,4 @@ set_target_properties(bolt_exe PROPERTIES OUTPUT_NAME bolt)
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
   target_compile_options(bolt_exe PRIVATE "-fsanitize=address,undefined")
   target_link_options(bolt_exe PRIVATE "-fsanitize=address,undefined")
-elseif(CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
-  # target_compile_options(bolt_exe PRIVATE "-pg")
-  # target_link_options(bolt_exe PRIVATE "-pg")
 endif()
