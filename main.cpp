@@ -1,4 +1,5 @@
 #include <re2/re2.h>
+#include <unistd.h>
 
 #include <array>
 #include <boost/json.hpp>
@@ -6,7 +7,6 @@
 #include <boost/program_options/value_semantic.hpp>
 #include <exception>
 #include <iostream>
-#include <istream>
 #include <fstream>
 #include <iterator>
 #include <optional>
@@ -14,6 +14,8 @@
 #include <stdexcept>
 #include <unordered_map>
 #include <unordered_set>
+
+#include <cstdio>
 
 #include "linespan.hpp"
 #include "logger.hpp"
@@ -337,6 +339,18 @@ auto second_pass(
 namespace po = boost::program_options;
 namespace json = boost::json;
 
+std::vector<char> get_linespan(const std::string& fname) {
+  if (::isatty(fileno(stdin)) && fname.size()) {
+    std::ifstream fstream;
+    fstream.open(fname);
+    std::vector<char> buf{
+    std::istreambuf_iterator<char>{fstream}, std::istreambuf_iterator<char>()};
+    return buf;
+  }
+  std::vector<char> buf{std::istreambuf_iterator<char>{std::cin}, std::istreambuf_iterator<char>()};
+  return buf;
+}
+
 int main(int argc, char* argv[]) {
   xpto::parser_state state{};
   xpto::user_options options{};
@@ -363,7 +377,7 @@ int main(int argc, char* argv[]) {
         "Debug log level (default 3==INFO)")
     ("in",
         po::value<std::string>(&options.file_in),
-        "Read assembly from file ARG.  '-' for stdin.")
+        "Read assembly from file ARG.")
     ;
   // clang-format on
 
@@ -378,13 +392,8 @@ int main(int argc, char* argv[]) {
     return 1;
   }
 
-  std::ifstream file_stream;
-  std::istream& input_stream = (options.file_in == "-") ?
-      std::cin :
-      (file_stream.open(options.file_in), file_stream);
-  std::vector<char> buf{
-    std::istreambuf_iterator<char>{input_stream}, std::istreambuf_iterator<char>()};
-  auto input = xpto::linespan{buf};
+  auto buf = get_linespan(options.file_in);
+  xpto::linespan input{buf};
 
   try {
     auto fp_output = first_pass(input, state, options);
