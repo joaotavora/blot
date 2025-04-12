@@ -84,11 +84,12 @@ void sweeping(const Input& input, Output& output, const user_options& o, F fn) {
       done = true;
     };
 
-    auto match = [&](auto&& re, matches_t& out_matches, int from = 0) -> bool {
-      match_t a(it->cbegin() + from, it->cend());
-      if (RE2::PartialMatchN(
-              a, re, &arg_ptrs.at(1), re.NumberOfCapturingGroups())) {
-        matches[0] = a;
+    auto match = [&](auto&& re, matches_t& out_matches, int offset = 0) -> bool {
+      auto from = it->cbegin() + offset;
+      match_t a(from, it->cend());
+      if (RE2::FindAndConsumeN(
+              &a, re, &arg_ptrs.at(1), re.NumberOfCapturingGroups())) {
+        matches[0] = match_t(from, a.begin());
         out_matches = matches_t(matches.begin(), re.NumberOfCapturingGroups());
         return true;
       } else
@@ -116,7 +117,7 @@ void sweeping(const Input& input, Output& output, const user_options& o, F fn) {
 
 // clang-format off
 const RE2 r_label_start                {R"(^([^:]+): *(?:#|$)(?:.*))"};
-const RE2 r_has_opcode                 {R"(^[[:space:]]+[A-Za-z]+)"};
+const RE2 r_has_opcode                 {R"(^[[:space:]]+[A-Za-z]+[[:space:]]*)"};
 const RE2 r_comment_only               {R"(^[[:space:]]*(?:[#;@]|//|/\*.*\*/).*$)"};
 const RE2 r_label_reference            {R"(\.[A-Z_a-z][$.0-9A-Z_a-z]*)"};
 const RE2 r_defines_global             {R"(^[[:space:]]*\.globa?l[[:space:]]*([.A-Z_a-z][$.0-9A-Z_a-z]*))"};
@@ -131,7 +132,8 @@ const RE2 r_data_defn                  {R"(^[[:space:]]*\.(string|asciz|ascii|[1
 
 struct parser_state {
   std::unordered_map<label_t, std::vector<label_t>> routines;
-  std::optional<label_t> current_routine{};
+  std::unordered_set<label_t> globals{};
+  std::optional<label_t> current_global{};
   std::optional<label_t> main_file_tag{};
   std::optional<std::string> main_file_name{};
   std::unordered_set<label_t> main_file_routines{};
@@ -161,9 +163,9 @@ auto first_pass(
         if (it->at(0) != '\t') {
           if ((match(r_label_start))) {
             LOG_TRACE("FP1.1 '{}'", *it);
-            if (s.routines.contains(matches[1])) {
+            if (s.globals.contains(matches[1])) {
               LOG_TRACE("FP1.1.1 '{}'", *it);
-              s.current_routine = matches[1];
+              s.current_global = matches[1];
             }
             LOG_TRACE("Preserve: FP1.1 '{}'", *it);
             preserve();
@@ -172,12 +174,13 @@ auto first_pass(
             kill();
           }
         } else {
-          if (s.current_routine && match(r_has_opcode)) {
+          if (s.current_global && match(r_has_opcode)) {
             LOG_TRACE("FP2.1 '{}'", *it);
             auto offset = matches[0].size();
+            s.routines[*s.current_global];
             while (match(r_label_reference, offset)) {
               LOG_TRACE("FP2.1.1 '{}'", *it);
-              s.routines[*s.current_routine].push_back(matches[0]);
+              s.routines[*s.current_global].push_back(matches[0]);
               offset += matches[0].size();
             }
             LOG_TRACE("Preserve: FP2.1 '{}'", *it);
@@ -188,7 +191,7 @@ auto first_pass(
           } else if (
                      match(r_defines_global) || match(r_defines_function_or_object)) {
             LOG_TRACE("FP2.3 '{}'", *it);
-            s.routines[matches[1]] = {};
+            s.globals.insert(matches[1]);
           } else if (match(r_source_file_hint)) {
             LOG_TRACE("FP2.4 '{}'", *it);
             // Horrible heuristic accounts for four cases
@@ -214,16 +217,16 @@ auto first_pass(
             }
           } else if (match(r_source_tag)) {
             LOG_TRACE("FP2.5 '{}'", *it);
-            if (s.current_routine && s.main_file_tag &&
+            if (s.current_global && s.main_file_tag &&
               matches[1] == s.main_file_tag) {
               LOG_TRACE("FP2.5.1 '{}'", *it);
-              s.main_file_routines.insert(*s.current_routine);
+              s.main_file_routines.insert(*s.current_global);
             }
             LOG_TRACE("Preserve: FP2.5 '{}'", *it);
             preserve();
           } else if (match(r_endblock)) {
             LOG_TRACE("FP2.6 '{}'", *it);
-            s.current_routine = std::nullopt;
+            s.current_global = std::nullopt;
             LOG_TRACE("Preserve: FP2.6 '{}'", *it);
             preserve();
           } else {
