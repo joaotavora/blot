@@ -1,8 +1,11 @@
+#include "options.hpp"
 #include "bolt/bolt.hpp"
 
 #include <boost/program_options.hpp>
 #include <iostream>
 #include <fstream>
+
+namespace xpto::bolt {
 
 bool parse_options(
     std::vector<const char*> args, int& loglevel,
@@ -45,17 +48,4 @@ bool parse_options(
   return false;
 }
 
-// FIXME: doesn't belong in this file
-std::vector<char> read_asm_from_file_or_stdin(const std::optional<std::string>& fname) {
-  if (::isatty(fileno(stdin)) && fname) {
-    std::ifstream fstream;
-    fstream.open(*fname);
-    std::vector<char> buf{
-      std::istreambuf_iterator<char>{fstream},
-      std::istreambuf_iterator<char>()};
-    return buf;
-  }
-  std::vector<char> buf{
-    std::istreambuf_iterator<char>{std::cin}, std::istreambuf_iterator<char>()};
-  return buf;
 }

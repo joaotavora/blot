@@ -1,22 +1,24 @@
-#include <re2/re2.h>
-#include <unistd.h>
-
-#include <boost/json.hpp>
-#include <exception>
-#include <iostream>
+#include "options.hpp"
+#include "ccj.hpp"
+#include "assembly.hpp"
 
 #include "bolt/bolt.hpp"
 #include "bolt/logger.hpp"
 
-namespace json = boost::json;
+#include <re2/re2.h>
 
-bool parse_options(
-    std::vector<const char*> args, int& loglevel, std::string& asm_file_name,
-    xpto::bolt::generation_options& gen_options);
+#include <unistd.h>
+#include <cstdio>
+#include <filesystem>
+#include <iostream>
+#include <fstream>
+#include <optional>
 
-std::vector<char> read_asm_from_file_or_stdin(const std::optional<std::string>& fname);
+namespace fs = std::filesystem;
+namespace bolt = xpto::bolt;
 
 int main(int argc, char* argv[]) {
+
   xpto::bolt::generation_options gen_options{};
   int loglevel{};
   std::string asm_file_name{};
@@ -28,12 +30,22 @@ int main(int argc, char* argv[]) {
 
   xpto::logger::set_level(static_cast<xpto::logger::level>(loglevel));
 
-  try {
-    auto input = read_asm_from_file_or_stdin(asm_file_name);
-    for (auto&& l : xpto::bolt::annotate(input, gen_options))
-      std::cout << l << "\n";
+  std::string input{};
 
-  } catch (std::exception& e) {
-    LOG_FATAL("Whoops {}", e.what());
+  if (asm_file_name.size()) {
+    LOG_INFO("Reading from {}", asm_file_name);
+    std::ifstream fstream;
+    fstream.open(asm_file_name);
+    input = bolt::get_asm(fstream);
+  } else if (auto ccj = xpto::bolt::find_compile_commands(); ccj
+    && ::isatty(::fileno(stdin))) {
+    LOG_INFO("Detected {}", ccj->c_str());
+  } else {
+    LOG_INFO("Reading from stdin");
+    input = bolt::get_asm(std::cin);
   }
+
+  LOG_INFO("Annotating {} bytes of asm", input.length());
+  for (auto&& l : xpto::bolt::annotate(input, gen_options))
+    std::cout << l << "\n";
 }

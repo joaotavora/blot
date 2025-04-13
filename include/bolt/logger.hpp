@@ -2,6 +2,7 @@
 
 #include <chrono>
 #include <cstdint>
+#include <filesystem>
 #include <format>
 #include <print>
 #include <source_location>
@@ -47,7 +48,8 @@ inline void log(
   if (level > global_level) return;
 
   std::println(
-      "{} {}:{} {}: {}", get_current_timestamp(), location.file_name(),
+      "{} {}:{} {}: {}", get_current_timestamp(),
+      std::filesystem::path{location.file_name()}.filename().c_str(),
       location.line(), level_to_string(level),
       std::format(fmt, std::forward<Args>(args)...));
 }
