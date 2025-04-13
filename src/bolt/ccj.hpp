@@ -1,17 +1,21 @@
 #pragma once
 
-#include <boost/json.hpp>
 #include <filesystem>
 #include <optional>
 
 namespace xpto::bolt {
 
 namespace fs = std::filesystem;
-namespace json = boost::json;
 
-std::optional<fs::path> find_compile_commands();
+struct compile_command {
+  fs::path directory;
+  std::string command;
+  fs::path file;
+};
 
-std::optional<json::object> find_compile_command(
+std::optional<fs::path> find_ccj();
+
+std::optional<compile_command> find_compile_command(
     const fs::path& compile_commands_path, const fs::path& target_file);
 
 }

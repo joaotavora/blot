@@ -17,7 +17,7 @@
 
 namespace xpto::bolt {
 
-struct generation_options {
+struct annotation_options {
   bool preserve_directives{};
   bool preserve_comments{};
   bool preserve_library_functions{};
@@ -55,7 +55,7 @@ inline std::optional<size_t> to_size_t(std::string_view sv) {
 }  // namespace utils
 
 template <typename Output, typename Input, typename F>
-void sweeping(const Input& input, Output& output, const generation_options& o, F fn) {
+void sweeping(const Input& input, Output& output, const annotation_options& o, F fn) {
   size_t linum{1};
 
   std::array<match_t, 10> matches;
@@ -141,7 +141,7 @@ struct parser_state {
 
 auto first_pass(
                 const auto& input, parser_state& s,
-                const generation_options& options) {
+                const annotation_options& options) {
   using output_t =
     std::vector<typename std::decay_t<decltype(input)>::value_type>;
   output_t output;
@@ -231,7 +231,7 @@ auto first_pass(
   return output;
 }
 
-inline void intermediate(parser_state& s, const generation_options& o) {
+inline void intermediate(parser_state& s, const annotation_options& o) {
   if (!s.main_file_tag)
     throw std::runtime_error("Cannot proceed without a 'main_file_tag'");
   if (o.preserve_library_functions) {
@@ -252,7 +252,7 @@ inline void intermediate(parser_state& s, const generation_options& o) {
 }
 
 auto second_pass(
-    const auto& input, parser_state& s, const generation_options& options) {
+    const auto& input, parser_state& s, const annotation_options& options) {
   std::optional<label_t> reachable_label{};
   std::optional<size_t> source_linum{};
 
@@ -333,7 +333,7 @@ auto second_pass(
 
 } // namespace detail
 
-inline auto annotate(std::span<const char> input, const generation_options& options) {
+inline auto annotate(std::span<const char> input, const annotation_options& options) {
 
   xpto::linespan lspan{input};
   detail::parser_state state{};

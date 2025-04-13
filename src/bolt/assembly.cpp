@@ -30,25 +30,39 @@ std::string get_asm(
   iss >> compiler;
 
   std::vector<std::string> args;
+  bool had_dash_c = false;
 
   for (std::string arg{}; iss >> arg;) {
     // Skip output specifiers (and the next argument, too)
     if (arg.substr(0, 2) == "-o") {
       iss >> arg;
       continue;
+    } else if (arg.substr(0,2) == "-c") {
+      arg = "-S";
+      had_dash_c = true;
     }
     args.push_back(std::move(arg));
   }
 
-  // Add assembly generation flags
-  args.push_back("-S");
-  args.push_back("-g");
+  // Add -g1
+  args.push_back("-g1");
+  // Add -S
+  if (!had_dash_c) {
+    args.push_back("-S");
+    args.push_back(file);
+  }
+
+  // Output to stdout
+  args.push_back("-o");
   args.push_back("-");
 
-  LOG_INFO("Running compiler: {}", compiler);
-  for (const auto& a : args) {
-    LOG_DEBUG(" arg: {}", a);
-  }
+  LOG_INFO("Running compiler {}:\n{}", compiler,
+    [&](){
+        std::string res{compiler};
+        res.reserve(command.length());
+        for (const auto& a : args) {res+= " "; res += a;}
+        return res;
+    }());
 
   // process(asio::any_io_executor, filesystem::path, range<string> args,
   // AdditionalInitializers...)
@@ -58,9 +72,10 @@ std::string get_asm(
   p2::process proc{
     ctx, compiler, args,
     p2::process_stdio{.in = nullptr, .out = rp, .err = nullptr}};
-  proc.wait();
   boost::system::error_code ec;
   asio::read(rp, asio::dynamic_buffer(output), ec);
+  assert(!ec || (ec == asio::error::eof));
+  proc.wait();
   return output;
 }
 

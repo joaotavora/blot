@@ -1,15 +1,17 @@
 #include "options.hpp"
-#include "bolt/bolt.hpp"
 
 #include <boost/program_options.hpp>
-#include <iostream>
+#include <boost/program_options/parsers.hpp>
 #include <fstream>
+#include <iostream>
+
+#include "bolt/bolt.hpp"
 
 namespace xpto::bolt {
 
 bool parse_options(
-    std::vector<const char*> args, int& loglevel,
-    std::string& asm_file_name, xpto::bolt::generation_options& gen_options) {
+    std::vector<const char*> args, int& loglevel, std::string& asm_file_name,
+    std::string& src_file_name, xpto::bolt::annotation_options& gen_options) {
   namespace po = boost::program_options;
   // clang-format off
   po::options_description desc("Allowed options");
@@ -34,11 +36,22 @@ bool parse_options(
     ("asm-file",
         po::value(&asm_file_name),
         "Read assembly from file ARG.")
+     ("source-file",
+        po::value<std::string>(&src_file_name),
+        "Input source file")
     ;
   // clang-format on
 
+  po::positional_options_description p;
+  p.add("source-file", 1);  // 1 means we expect max one value for this option
+
   po::variables_map vm;
-  po::store(po::parse_command_line(static_cast<int>(args.size()), args.data(), desc), vm);
+  po::store(
+      po::command_line_parser{static_cast<int>(args.size()), args.data()}
+          .options(desc)
+          .positional(p)
+          .run(),
+      vm);
   po::notify(vm);
 
   if (vm.count("help")) {
@@ -48,4 +61,4 @@ bool parse_options(
   return false;
 }
 
-}
+}  // namespace xpto::bolt
