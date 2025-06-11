@@ -83,7 +83,7 @@ void sweeping(const Input& input, Output& output, const annotation_options& o, F
       if (RE2::FindAndConsumeN(
               &a, re, &arg_ptrs.at(1), re.NumberOfCapturingGroups())) {
         matches[0] = match_t(from, a.begin());
-        out_matches = matches_t(matches.begin(), re.NumberOfCapturingGroups());
+        out_matches = matches_t(matches.begin(), re.NumberOfCapturingGroups()+1);
         return true;
       } else
         return false;
