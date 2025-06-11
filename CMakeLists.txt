@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.30)
-project(bolt LANGUAGES CXX)
+project(blot LANGUAGES CXX)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(CMAKE_CXX_STANDARD 23)
 
@@ -15,19 +15,19 @@ endif()
 
 find_package(Boost REQUIRED COMPONENTS program_options process json)
 
-file(GLOB sources CONFIGURE_DEPENDS src/bolt/*.cpp)
-add_executable(bolt_exe ${sources})
-target_include_directories(bolt_exe PRIVATE include)
-target_link_libraries(bolt_exe PRIVATE
+file(GLOB sources CONFIGURE_DEPENDS src/blot/*.cpp)
+add_executable(blot_exe ${sources})
+target_include_directories(blot_exe PRIVATE include)
+target_link_libraries(blot_exe PRIVATE
   re2::re2
   Boost::headers
   Boost::program_options
   Boost::process
   Boost::json
 )
-set_target_properties(bolt_exe PROPERTIES OUTPUT_NAME bolt)
+set_target_properties(blot_exe PROPERTIES OUTPUT_NAME blot)
 
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
-  target_compile_options(bolt_exe PRIVATE "-fsanitize=address,undefined")
-  target_link_options(bolt_exe PRIVATE "-fsanitize=address,undefined")
+  target_compile_options(blot_exe PRIVATE "-fsanitize=address,undefined")
+  target_link_options(blot_exe PRIVATE "-fsanitize=address,undefined")
 endif()

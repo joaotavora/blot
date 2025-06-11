@@ -11,9 +11,9 @@
 #include <string>
 #include <vector>
 
-#include "bolt/logger.hpp"
+#include "blot/logger.hpp"
 
-namespace xpto::bolt {
+namespace xpto::blot {
 
 namespace fs = std::filesystem;
 namespace p2 = boost::process::v2;
@@ -85,4 +85,4 @@ std::string get_asm(std::istream& in) {
     std::istreambuf_iterator<char>{in}, std::istreambuf_iterator<char>()};
 }
 
-}  // namespace xpto::bolt
+}  // namespace xpto::blot

@@ -15,7 +15,7 @@
 #include <unordered_map>
 #include <unordered_set>
 
-namespace xpto::bolt {
+namespace xpto::blot {
 
 struct annotation_options {
   bool preserve_directives{};
@@ -342,4 +342,4 @@ inline auto annotate(std::span<const char> input, const annotation_options& opti
   detail::intermediate(state, options);
   return detail:: second_pass(fp_output, state, options);
 }
-} // namespace xpto::bolt
+} // namespace xpto::blot

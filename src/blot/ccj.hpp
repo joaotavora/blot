@@ -3,7 +3,7 @@
 #include <filesystem>
 #include <optional>
 
-namespace xpto::bolt {
+namespace xpto::blot {
 
 namespace fs = std::filesystem;
 

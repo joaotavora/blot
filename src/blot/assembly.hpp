@@ -3,7 +3,7 @@
 #include <filesystem>
 #include <string>
 
-namespace xpto::bolt {
+namespace xpto::blot {
 
 namespace fs = std::filesystem;
 
@@ -14,4 +14,4 @@ std::string get_asm(
 std::string get_asm(std::istream& istream);
 
 
-}  // namespace xpto::bolt
+}  // namespace xpto::blot

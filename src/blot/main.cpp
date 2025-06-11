@@ -8,16 +8,16 @@
 #include <optional>
 
 #include "assembly.hpp"
-#include "bolt/bolt.hpp"
-#include "bolt/logger.hpp"
+#include "blot/blot.hpp"
+#include "blot/logger.hpp"
 #include "ccj.hpp"
 #include "options.hpp"
 
 namespace fs = std::filesystem;
-namespace bolt = xpto::bolt;
+namespace blot = xpto::blot;
 
 int main(int argc, char* argv[]) { // NOLINT(*exception*)
-  xpto::bolt::annotation_options gen_options{};
+  xpto::blot::annotation_options gen_options{};
   int loglevel{};
   std::string asm_file_name{};
   std::string src_file_name{};
@@ -35,30 +35,30 @@ int main(int argc, char* argv[]) { // NOLINT(*exception*)
     LOG_INFO("Reading from {}", asm_file_name);
     std::ifstream fstream;
     fstream.open(asm_file_name);
-    input = bolt::get_asm(fstream);
+    input = blot::get_asm(fstream);
   } else if (!isatty(::fileno(stdin))) {
     LOG_INFO("Piped input detected");
-    input = bolt::get_asm(std::cin);
+    input = blot::get_asm(std::cin);
   } else if (src_file_name.size()) {
-    auto ccj = xpto::bolt::find_ccj();
+    auto ccj = xpto::blot::find_ccj();
     if (!ccj) {
       LOG_ERROR("Can't find compile_commands.json", src_file_name);
       return -1;
     }
     LOG_INFO("Detected {}", ccj->c_str());
-    auto cmd = xpto::bolt::find_compile_command(*ccj, src_file_name);
+    auto cmd = xpto::blot::find_compile_command(*ccj, src_file_name);
     if (!cmd) {
       LOG_ERROR("Can't find an entry for {}", src_file_name);
       return -1;
     }
     LOG_INFO("Got this command '{}'", cmd->command);
-    input = xpto::bolt::get_asm(cmd->directory, cmd->command, cmd->file);
+    input = xpto::blot::get_asm(cmd->directory, cmd->command, cmd->file);
   } else {
     LOG_INFO("Reading from stdin");
-    input = bolt::get_asm(std::cin);
+    input = blot::get_asm(std::cin);
   }
 
   LOG_INFO("Annotating {} bytes of asm", input.length());
-  for (auto&& l : xpto::bolt::annotate(input, gen_options))
+  for (auto&& l : xpto::blot::annotate(input, gen_options))
     std::cout << l << "\n";
 }

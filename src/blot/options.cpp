@@ -5,13 +5,13 @@
 #include <fstream>
 #include <iostream>
 
-#include "bolt/bolt.hpp"
+#include "blot/blot.hpp"
 
-namespace xpto::bolt {
+namespace xpto::blot {
 
 bool parse_options(
     std::vector<const char*> args, int& loglevel, std::string& asm_file_name,
-    std::string& src_file_name, xpto::bolt::annotation_options& gen_options) {
+    std::string& src_file_name, xpto::blot::annotation_options& gen_options) {
   namespace po = boost::program_options;
   // clang-format off
   po::options_description desc("Allowed options");
@@ -61,4 +61,4 @@ bool parse_options(
   return false;
 }
 
-}  // namespace xpto::bolt
+}  // namespace xpto::blot

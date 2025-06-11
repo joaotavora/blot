@@ -8,9 +8,9 @@
 #include <fstream>
 #include <optional>
 
-#include "bolt/logger.hpp"
+#include "blot/logger.hpp"
 
-namespace xpto::bolt {
+namespace xpto::blot {
 
 namespace fs = std::filesystem;
 namespace json = boost::json;
@@ -70,4 +70,4 @@ std::optional<compile_command> find_compile_command(
   return std::nullopt;
 }
 
-}  // namespace xpto::bolt
+}  // namespace xpto::blot
