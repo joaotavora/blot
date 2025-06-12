@@ -1,10 +1,11 @@
 #pragma once
 
+#include <fmt/base.h>
+#include <fmt/format.h>
+
 #include <chrono>
 #include <cstdint>
 #include <filesystem>
-#include <format>
-#include <print>
 #include <source_location>
 #include <string>
 #include <string_view>
@@ -32,11 +33,9 @@ inline void set_level(level level) { global_level = level; }
 
 inline std::string get_current_timestamp() {
   using namespace std::chrono;
-
   auto now = system_clock::now();
   auto ymd = year_month_day{floor<days>(now)};
   auto hms = hh_mm_ss{floor<milliseconds>(now - floor<days>(now))};
-
   return std::format("{} {}", ymd, hms);
 }
 
@@ -44,14 +43,20 @@ inline std::string get_current_timestamp() {
 template <typename... Args>
 inline void log(
     level level, const std::source_location& location,
-    std::format_string<Args...> fmt, Args&&... args) {
+    fmt::format_string<Args...> fmt, Args&&... args) {
   if (level > global_level) return;
 
-  std::println(
-      "{} {}:{} {}: {}", get_current_timestamp(),
+  fmt::println(
+#ifndef LOG_NO_TIMESTAMP
+      "{} "
+#endif
+      "{}:{} {}: {}",
+#ifndef LOG_NO_TIMESTAMP
+      get_current_timestamp(),
+#endif
       std::filesystem::path{location.file_name()}.filename().c_str(),
       location.line(), level_to_string(level),
-      std::format(fmt, std::forward<Args>(args)...));
+      fmt::format(fmt, std::forward<Args>(args)...));
 }
 
 }  // namespace xpto::logger

@@ -14,6 +14,7 @@ if(RE2_FOUND)
 endif()
 
 find_package(Boost REQUIRED COMPONENTS program_options process json)
+find_package(Fmt REQUIRED)
 
 file(GLOB sources CONFIGURE_DEPENDS src/blot/*.cpp)
 add_executable(blot_exe ${sources})
@@ -24,8 +25,10 @@ target_link_libraries(blot_exe PRIVATE
   Boost::program_options
   Boost::process
   Boost::json
+  fmt::fmt
 )
 set_target_properties(blot_exe PROPERTIES OUTPUT_NAME blot)
+target_compile_definitions(blot_exe PRIVATE LOG_NO_TIMESTAMP ON)
 
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
   target_compile_options(blot_exe PRIVATE "-fsanitize=address,undefined")
