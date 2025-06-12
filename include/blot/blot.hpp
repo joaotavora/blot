@@ -1,8 +1,5 @@
 #pragma once
 
-#include "linespan.hpp"
-#include "logger.hpp"
-
 #include <re2/re2.h>
 
 #include <array>
@@ -14,6 +11,9 @@
 #include <stdexcept>
 #include <unordered_map>
 #include <unordered_set>
+
+#include "linespan.hpp"
+#include "logger.hpp"
 
 namespace xpto::blot {
 
@@ -31,12 +31,19 @@ struct annotation_options {
   bool preserve_unused_labels{};
 };
 
+using linum_t = size_t;
+using linemap_t = std::map<linum_t, std::set<std::pair<linum_t, linum_t>>>;
+
+struct annotation_result {
+  std::vector<std::string> output;
+  linemap_t linemap;
+};
+
 namespace detail {
 using input_t = xpto::linespan;
 using match_t = std::string_view;
 using matches_t = std::span<match_t>;
 using label_t = std::string_view;
-using linum_t = size_t;
 
 namespace utils {
 template <typename Dest, typename T, size_t N, std::size_t... Is>
@@ -62,7 +69,8 @@ inline std::optional<size_t> to_size_t(std::string_view sv) {
 }  // namespace utils
 
 template <typename Output, typename Input, typename F>
-void sweeping(const Input& input, Output& output, const annotation_options& o, F fn) {
+void sweeping(
+    const Input& input, Output& output, const annotation_options& o, F fn) {
   size_t linum{1};
 
   std::array<match_t, 10> matches;
@@ -74,7 +82,7 @@ void sweeping(const Input& input, Output& output, const annotation_options& o, F
 
     auto preserve = [&]() {
       linum++;
-      output.push_back(*it);
+      output.emplace_back(*it);
       ++it;
       done = true;
     };
@@ -84,13 +92,15 @@ void sweeping(const Input& input, Output& output, const annotation_options& o, F
       done = true;
     };
 
-    auto match = [&](auto&& re, matches_t& out_matches, int offset = 0) -> bool {
+    auto match = [&](auto&& re, matches_t& out_matches,
+                     int offset = 0) -> bool {
       auto from = it->cbegin() + offset;
       match_t a(from, it->cend());
       if (RE2::FindAndConsumeN(
               &a, re, &arg_ptrs.at(1), re.NumberOfCapturingGroups())) {
         matches[0] = match_t(from, a.begin());
-        out_matches = matches_t(matches.begin(), re.NumberOfCapturingGroups()+1);
+        out_matches =
+            matches_t(matches.begin(), re.NumberOfCapturingGroups() + 1);
         return true;
       } else
         return false;
@@ -139,18 +149,38 @@ struct parser_state {
   std::unordered_set<label_t> main_file_routines{};
   std::unordered_set<label_t> used_labels{};
 
-  std::unordered_map<linum_t, std::vector<linum_t>> line_mappings{};
+  linemap_t linemap{};
 
   void register_mapping(linum_t source_linum, linum_t asm_linum) {
-    line_mappings[source_linum].push_back(asm_linum);
+    auto [probe, inserted] = linemap.insert({source_linum, {{asm_linum, asm_linum}}});
+    if (!inserted) {
+      auto& set = probe->second;
+      auto y = set.begin();
+      for (auto x = y++; x != set.end(); ++x, ++y) {
+        if (asm_linum == x->first - 1) {
+          set.emplace(asm_linum, x->second);
+          set.erase(x);
+        } else if (asm_linum == x->second + 1) {
+          if (y != set.end() && y->first -1 == asm_linum){
+            set.emplace(x->first, y->second);
+            set.erase(x);
+            set.erase(y);
+          } else {
+            set.emplace(x->first, asm_linum);
+            set.erase(x);
+          }
+          return;
+        }
+      }
+      set.emplace(asm_linum, asm_linum);
+    }
   }
 };
 
 auto first_pass(
-                const auto& input, parser_state& s,
-                const annotation_options& options) {
+    const auto& input, parser_state& s, const annotation_options& options) {
   using output_t =
-    std::vector<typename std::decay_t<decltype(input)>::value_type>;
+      std::vector<typename std::decay_t<decltype(input)>::value_type>;
   output_t output;
 
   matches_t matches{};
@@ -189,7 +219,7 @@ auto first_pass(
             LOG_TRACE("Kill: FP2.2 '{}'", *it);
             kill();
           } else if (
-                     match(r_defines_global) || match(r_defines_function_or_object)) {
+              match(r_defines_global) || match(r_defines_function_or_object)) {
             LOG_TRACE("FP2.3 '{}'", *it);
             s.globals.insert(matches[1]);
           } else if (match(r_source_file_hint)) {
@@ -205,20 +235,21 @@ auto first_pass(
             // directives, and the following code tries to guess
             // accordingly.
             if (!s.main_file_name && matches[3].size()) {
-              s.main_file_name = matches[3]=="-"?"<stdin>":matches[3];
+              s.main_file_name = matches[3] == "-" ? "<stdin>" : matches[3];
               s.main_file_tag = matches[1];
-              LOG_DEBUG("FP2.4.1 set main_file_name={} and main_file_tag={}",
+              LOG_DEBUG(
+                  "FP2.4.1 set main_file_name={} and main_file_tag={}",
                   *s.main_file_name, *s.main_file_tag);
             }
-            if (s.main_file_name && !matches[3].size() && *s.main_file_name == matches[2]) {
-              LOG_DEBUG("FP2.4.2 updated main_file_tag={}",
-                  *s.main_file_tag);
+            if (s.main_file_name && !matches[3].size() &&
+                *s.main_file_name == matches[2]) {
+              LOG_DEBUG("FP2.4.2 updated main_file_tag={}", *s.main_file_tag);
               s.main_file_tag = matches[1];
             }
           } else if (match(r_source_tag)) {
             LOG_TRACE("FP2.5 '{}'", *it);
             if (s.current_global && s.main_file_tag &&
-              matches[1] == s.main_file_tag) {
+                matches[1] == s.main_file_tag) {
               LOG_TRACE("FP2.5.1 '{}'", *it);
               s.main_file_routines.insert(*s.current_global);
             }
@@ -258,13 +289,13 @@ inline void intermediate(parser_state& s, const annotation_options& o) {
   }
 }
 
-auto second_pass(
+annotation_result second_pass(
     const auto& input, parser_state& s, const annotation_options& options) {
   std::optional<label_t> reachable_label{};
   std::optional<size_t> source_linum{};
 
   using output_t =
-      std::vector<typename std::decay_t<decltype(input)>::value_type>;
+    std::vector<std::string>;
   output_t output;
 
   sweeping(
@@ -335,18 +366,18 @@ auto second_pass(
           }
         }
       });
-  return output;
+  return {output, s.linemap};
 }
 
-} // namespace detail
+}  // namespace detail
 
-inline auto annotate(std::span<const char> input, const annotation_options& options) {
-
+inline annotation_result annotate(
+    std::span<const char> input, const annotation_options& options) {
   xpto::linespan lspan{input};
   detail::parser_state state{};
 
   auto fp_output = detail::first_pass(lspan, state, options);
   detail::intermediate(state, options);
-  return detail:: second_pass(fp_output, state, options);
+  return detail::second_pass(fp_output, state, options);
 }
-} // namespace xpto::blot
+}  // namespace xpto::blot

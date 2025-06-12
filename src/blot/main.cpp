@@ -75,6 +75,18 @@ int main(int argc, char* argv[]) { // NOLINT(*exception*)
   }
 
   LOG_INFO("Annotating {} bytes of asm", input.length());
-  for (auto&& l : xpto::blot::annotate(input, aopts))
+  auto result = xpto::blot::annotate(input, aopts);
+  for (auto&& l : result.output)
     std::cout << l << "\n";
+
+
+  LOG_INFO("And now the linemap");
+  
+  for (auto&& x : result.linemap) {
+    std::cout << x.first << ": ";
+    for (auto&& [y1, y2] : x.second) {
+      std::cout << "[" << y1 << "," << y2 << "]" << " ";
+    }
+    std::cout << "\n";
+  }
 }
