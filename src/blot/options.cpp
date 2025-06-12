@@ -1,64 +1,58 @@
 #include "options.hpp"
-
-#include <boost/program_options.hpp>
-#include <boost/program_options/parsers.hpp>
-#include <fstream>
-#include <iostream>
-
 #include "blot/blot.hpp"
+
+#include <CLI/CLI.hpp>
+#include <optional>
+
+namespace fs = std::filesystem;
 
 namespace xpto::blot {
 
-bool parse_options(
-    std::vector<const char*> args, int& loglevel, std::string& asm_file_name,
-    std::string& src_file_name, xpto::blot::annotation_options& gen_options) {
-  namespace po = boost::program_options;
-  // clang-format off
-  po::options_description desc("Allowed options");
-  desc.add_options()
-    ("help", "show this help")
-    ("preserve-directives,pd",
-        po::bool_switch(&gen_options.preserve_directives)->default_value(false),
-        "preserve all non-comment assembly directives")
-    ("preserve-comments,pc",
-        po::bool_switch(&gen_options.preserve_comments)->default_value(false),
-        "preserve comments")
-    ("preserve-library-functions,pl",
-        po::bool_switch(&gen_options.preserve_library_functions)->default_value(false),
-        "preserve library functions")
-    ("preserve-unused-labels,pu",
-        po::bool_switch(&gen_options.preserve_unused_labels)->default_value(false),
-        "preserve unused labels")
-    ("d", po::value<int>(&loglevel)->default_value(
-        static_cast<int>(xpto::logger::level::info)
-        ),
-        "Debug log level (default 3==INFO)")
-    ("asm-file",
-        po::value(&asm_file_name),
-        "Read assembly from file ARG.")
-     ("source-file",
-        po::value<std::string>(&src_file_name),
-        "Input source file")
-    ;
-  // clang-format on
+std::optional<int> parse_options(
+    std::span<char*> args, int& loglevel,
+    xpto::blot::file_options& fopts,
+    xpto::blot::annotation_options& aopts) {
+  CLI::App app{"Compiler explorer-like util"};
 
-  po::positional_options_description p;
-  p.add("source-file", 1);  // 1 means we expect max one value for this option
+  app.allow_non_standard_option_names();
 
-  po::variables_map vm;
-  po::store(
-      po::command_line_parser{static_cast<int>(args.size()), args.data()}
-          .options(desc)
-          .positional(p)
-          .run(),
-      vm);
-  po::notify(vm);
+  app.add_flag(
+      "-pd,--preserve-directives", aopts.preserve_directives,
+      "preserve all non-comment assembly-directives")
+    ->capture_default_str();
+  app.add_flag(
+      "-pc,--preserve-comments", aopts.preserve_directives,
+      "preserve comments")
+    ->capture_default_str();
+  app.add_flag(
+      "-pu,--preserve-unused", aopts.preserve_directives,
+      "preserve unused labels")
+    ->capture_default_str();
+  app.add_flag(
+      "-pl,--preserve-library-functions", aopts.preserve_directives,
+      "preserve library functions")
+    ->capture_default_str();
+  app.add_option(
+      "-d, --debug",
+      loglevel,
+      "Debug log level (3=INFO)")
+    ->capture_default_str();
+  app.add_option(
+      "--asm-file",
+      fopts.asm_file_name,
+      "Read assembly directly from file");
+  app.add_option(
+      "source-file",
+      fopts.src_file_name,
+      "Source file to annotate");
 
-  if (vm.count("help")) {
-    desc.print(std::cout);
-    return true;
-  }
-  return false;
+  try {
+    (app).parse(std::vector<std::string>(args.begin() + 1, args.end()));
+  } catch (const CLI ::ParseError& e) {
+    return (app).exit(e);
+  };
+
+  return std::nullopt;
 }
 
 }  // namespace xpto::blot

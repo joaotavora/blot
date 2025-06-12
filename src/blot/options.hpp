@@ -2,11 +2,15 @@
 
 #include "blot/blot.hpp"
 
-#include <boost/program_options.hpp>
+#include <filesystem>
+#include <span>
+
+namespace fs = std::filesystem;
 
 namespace xpto::blot {
 
-bool parse_options(
-    std::vector<const char*> args, int& loglevel, std::string& asm_file_name,
-    std::string& src_file_name, xpto::blot::annotation_options& gen_options);
+std::optional<int> parse_options(
+    std::span<char*> args, int& loglevel,
+    xpto::blot::file_options& fopts,
+    xpto::blot::annotation_options& aopts);
 }

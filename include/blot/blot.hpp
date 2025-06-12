@@ -17,6 +17,13 @@
 
 namespace xpto::blot {
 
+namespace fs = std::filesystem;
+
+struct file_options {
+  std::optional<fs::path> asm_file_name{};
+  std::optional<fs::path> src_file_name{};
+};
+
 struct annotation_options {
   bool preserve_directives{};
   bool preserve_comments{};

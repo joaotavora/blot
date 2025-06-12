@@ -13,8 +13,9 @@ if(RE2_FOUND)
   )
 endif()
 
-find_package(Boost REQUIRED COMPONENTS program_options process json)
+find_package(Boost REQUIRED COMPONENTS process json)
 find_package(Fmt REQUIRED)
+find_package(CLI11 REQUIRED)
 
 file(GLOB sources CONFIGURE_DEPENDS src/blot/*.cpp)
 add_executable(blot_exe ${sources})
@@ -22,7 +23,6 @@ target_include_directories(blot_exe PRIVATE include)
 target_link_libraries(blot_exe PRIVATE
   re2::re2
   Boost::headers
-  Boost::program_options
   Boost::process
   Boost::json
   fmt::fmt
