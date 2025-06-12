@@ -34,3 +34,9 @@ if(CMAKE_BUILD_TYPE STREQUAL "Debug")
   target_compile_options(blot_exe PRIVATE "-fsanitize=address,undefined")
   target_link_options(blot_exe PRIVATE "-fsanitize=address,undefined")
 endif()
+
+# This 'silly' library is just here so these files show up in blot's
+# `compile_commands.json' file and thus I can reference them directly
+# in my tests.
+file(GLOB fixture_sources CONFIGURE_DEPENDS test/*.cpp)
+add_library(fixture ${fixture_sources})
