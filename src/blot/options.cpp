@@ -21,15 +21,15 @@ std::optional<int> parse_options(
       "preserve all non-comment assembly-directives")
     ->capture_default_str();
   app.add_flag(
-      "-pc,--preserve-comments", aopts.preserve_directives,
+      "-pc,--preserve-comments", aopts.preserve_comments,
       "preserve comments")
     ->capture_default_str();
   app.add_flag(
-      "-pu,--preserve-unused", aopts.preserve_directives,
+      "-pu,--preserve-unused", aopts.preserve_unused_labels,
       "preserve unused labels")
     ->capture_default_str();
   app.add_flag(
-      "-pl,--preserve-library-functions", aopts.preserve_directives,
+      "-pl,--preserve-library-functions", aopts.preserve_library_functions,
       "preserve library functions")
     ->capture_default_str();
   app.add_option(
