@@ -1,0 +1,14 @@
+[
+{
+  "directory": ".",
+  "command": "/usr/bin/c++ -std=c++23 -g -O2 -o test00.o -c test00.cpp",
+  "file": "test00.cpp",
+  "output": "test00.o"
+},
+{
+  "directory": ".",
+  "command": "/usr/bin/c++ -std=c++23 -g -O2 -o test01.o -c test01.cpp",
+  "file": "test01.cpp",
+  "output": "test01.o"
+}
+]

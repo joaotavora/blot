@@ -1,0 +1,90 @@
+{
+  "assembly": [
+    "main:",
+    "\tpushq\t%rbp",
+    "\tmovl\t$26, %edi",
+    "\tpushq\t%rbx",
+    "\tsubq\t$24, %rsp",
+    "\tcall\t_Znwm@PLT",
+    "\tmovdqa\t.LC0(%rip), %xmm0",
+    "\tmovl\t$25, %edx",
+    "\tleaq\t_ZSt4cout(%rip), %rdi",
+    "\tmovb\t$0, 25(%rax)",
+    "\tmovq\t%rax, %rsi",
+    "\tmovq\t%rax, %rbx",
+    "\tmovups\t%xmm0, (%rax)",
+    "\tmovdqa\t.LC1(%rip), %xmm0",
+    "\tmovups\t%xmm0, 9(%rax)",
+    "\tcall\t_ZSt16__ostream_insertIcSt11char_traitsIcEERSt13basic_ostreamIT_T0_ES6_PKS3_l@PLT",
+    "\tmovq\t%rax, %rbp",
+    "\tmovq\t(%rax), %rax",
+    "\tmovq\t-24(%rax), %rax",
+    "\tmovq\t240(%rbp,%rax), %rdi",
+    "\ttestq\t%rdi, %rdi",
+    "\tje\t.L12",
+    "\tcmpb\t$0, 56(%rdi)",
+    "\tje\t.L5",
+    "\tmovsbl\t67(%rdi), %esi",
+    ".L6:",
+    "\tmovq\t%rbp, %rdi",
+    "\tcall\t_ZNSo3putEc@PLT",
+    "\tmovq\t%rax, %rdi",
+    "\tcall\t_ZNSo5flushEv@PLT",
+    "\tmovq\t%rbx, %rdi",
+    "\tmovl\t$26, %esi",
+    "\tcall\t_ZdlPvm@PLT",
+    "\taddq\t$24, %rsp",
+    "\txorl\t%eax, %eax",
+    "\tpopq\t%rbx",
+    "\tpopq\t%rbp",
+    "\tret",
+    ".L5:",
+    "\tmovq\t%rdi, 8(%rsp)",
+    "\tcall\t_ZNKSt5ctypeIcE13_M_widen_initEv@PLT",
+    "\tmovq\t8(%rsp), %rdi",
+    "\tleaq\t_ZNKSt5ctypeIcE8do_widenEc(%rip), %rdx",
+    "\tmovl\t$10, %esi",
+    "\tmovq\t(%rdi), %rax",
+    "\tmovq\t48(%rax), %rax",
+    "\tcmpq\t%rdx, %rax",
+    "\tje\t.L6",
+    "\tmovl\t$10, %esi",
+    "\tcall\t*%rax",
+    "\tmovsbl\t%al, %esi",
+    "\tjmp\t.L6",
+    "\tjmp\t.L11",
+    ".L12:",
+    "\tcall\t_ZSt16__throw_bad_castv@PLT",
+    ".L11:",
+    "\tmovq\t%rax, %rbp",
+    "\tmovq\t%rbx, %rdi",
+    "\tmovl\t$26, %esi",
+    "\tcall\t_ZdlPvm@PLT",
+    "\tmovq\t%rbp, %rdi",
+    "\tcall\t_Unwind_Resume@PLT",
+    ".LC0:",
+    "\t.quad\t4836914856867947848",
+    "\t.quad\t2338042672858557807",
+    ".LC1:",
+    "\t.quad\t4981106967807881325",
+    "\t.quad\t2410100292766691448"
+  ],
+  "line_mappings": {
+    "4": [
+      {
+        "start": 2,
+        "end": 2
+      },
+      {
+        "start": 4,
+        "end": 5
+      }
+    ],
+    "8": [
+      {
+        "start": 34,
+        "end": 38
+      }
+    ]
+  }
+}

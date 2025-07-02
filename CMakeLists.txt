@@ -13,7 +13,7 @@ if(RE2_FOUND)
   )
 endif()
 
-find_package(Boost REQUIRED COMPONENTS process json)
+find_package(Boost REQUIRED COMPONENTS process json unit_test_framework)
 find_package(Fmt REQUIRED)
 find_package(CLI11 REQUIRED)
 
@@ -35,8 +35,26 @@ if(CMAKE_BUILD_TYPE STREQUAL "Debug")
   target_link_options(blot_exe PRIVATE "-fsanitize=address,undefined")
 endif()
 
-# This 'silly' library is just here so these files show up in blot's
-# `compile_commands.json' file and thus I can reference them directly
-# in my tests.
-file(GLOB fixture_sources CONFIGURE_DEPENDS test/*.cpp)
+# Test fixture library - shows up in compile_commands.json
+file(GLOB fixture_sources CONFIGURE_DEPENDS test/fixture/*.cpp)
 add_library(fixture ${fixture_sources})
+
+# Boost.Test runner
+add_executable(test_blot 
+  test/test_blot.cpp
+  src/blot/ccj.cpp
+  src/blot/assembly.cpp
+)
+target_include_directories(test_blot PRIVATE include)
+target_link_libraries(test_blot PRIVATE
+  re2::re2
+  Boost::headers
+  Boost::process
+  Boost::json
+  Boost::unit_test_framework
+  fmt::fmt
+)
+target_compile_definitions(test_blot PRIVATE LOG_NO_TIMESTAMP ON)
+
+enable_testing()
+add_test(NAME blot_tests COMMAND test_blot)
