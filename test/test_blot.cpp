@@ -48,46 +48,65 @@ struct TestFixture {
         return xpto::blot::get_asm(cmd->directory, cmd->command, cmd->file);
     }
     
+    // Reusable test function for any fixture
+    void test_annotation_against_expectation(
+        const fs::path& cpp_file, 
+        const fs::path& expectation_file, 
+        const fs::path& compile_commands_file,
+        const xpto::blot::annotation_options& aopts = {}) {
+        
+        // Generate assembly from compile commands
+        auto cmd = xpto::blot::find_compile_command(compile_commands_file, cpp_file);
+        BOOST_REQUIRE(cmd.has_value());
+        std::string assembly = xpto::blot::get_asm(cmd->directory, cmd->command, cmd->file);
+        
+        // Run blot annotation with provided options
+        auto result = xpto::blot::annotate(assembly, aopts);
+        
+        // Load expected results
+        std::ifstream file(expectation_file);
+        BOOST_REQUIRE(file.is_open());
+        std::string content((std::istreambuf_iterator<char>(file)),
+                           std::istreambuf_iterator<char>());
+        auto expected = json::parse(content).as_object();
+        
+        // Compare assembly output
+        auto& expected_assembly = expected["assembly"].as_array();
+        BOOST_REQUIRE_EQUAL(result.output.size(), expected_assembly.size());
+        for (size_t i = 0; i < result.output.size(); ++i) {
+            BOOST_CHECK_EQUAL(result.output[i], expected_assembly[i].as_string());
+        }
+        
+        // Compare line mappings
+        auto& expected_mappings = expected["line_mappings"].as_object();
+        BOOST_REQUIRE_EQUAL(result.linemap.size(), expected_mappings.size());
+        
+        for (auto& [src_line, asm_ranges] : result.linemap) {
+            std::string src_key = std::to_string(src_line);
+            BOOST_REQUIRE(expected_mappings.contains(src_key));
+            
+            auto& expected_ranges = expected_mappings[src_key].as_array();
+            BOOST_REQUIRE_EQUAL(asm_ranges.size(), expected_ranges.size());
+            
+            auto range_it = asm_ranges.begin();
+            for (size_t i = 0; i < expected_ranges.size(); ++i, ++range_it) {
+                auto& expected_range = expected_ranges[i].as_object();
+                BOOST_CHECK_EQUAL(range_it->first, expected_range["start"].as_int64());
+                BOOST_CHECK_EQUAL(range_it->second, expected_range["end"].as_int64());
+            }
+        }
+    }
+    
 };
 
 BOOST_FIXTURE_TEST_SUITE(BlotTestSuite, TestFixture)
 
 BOOST_AUTO_TEST_CASE(test00_annotation) {
-    // Generate assembly from compile commands
-    std::string assembly = generate_assembly("test00.cpp");
-    
-    // Run blot annotation with default options
-    xpto::blot::annotation_options opts{};
-    auto result = xpto::blot::annotate(assembly, opts);
-    
-    // Load expected results
-    auto expected = load_expected("test00");
-    
-    // Compare assembly output
-    auto& expected_assembly = expected["assembly"].as_array();
-    BOOST_REQUIRE_EQUAL(result.output.size(), expected_assembly.size());
-    for (size_t i = 0; i < result.output.size(); ++i) {
-        BOOST_CHECK_EQUAL(result.output[i], expected_assembly[i].as_string());
-    }
-    
-    // Compare line mappings
-    auto& expected_mappings = expected["line_mappings"].as_object();
-    BOOST_REQUIRE_EQUAL(result.linemap.size(), expected_mappings.size());
-    
-    for (auto& [src_line, asm_ranges] : result.linemap) {
-        std::string src_key = std::to_string(src_line);
-        BOOST_REQUIRE(expected_mappings.contains(src_key));
-        
-        auto& expected_ranges = expected_mappings[src_key].as_array();
-        BOOST_REQUIRE_EQUAL(asm_ranges.size(), expected_ranges.size());
-        
-        auto range_it = asm_ranges.begin();
-        for (size_t i = 0; i < expected_ranges.size(); ++i, ++range_it) {
-            auto& expected_range = expected_ranges[i].as_object();
-            BOOST_CHECK_EQUAL(range_it->first, expected_range["start"].as_int64());
-            BOOST_CHECK_EQUAL(range_it->second, expected_range["end"].as_int64());
-        }
-    }
+    test_annotation_against_expectation("test00.cpp", "test00.json", ccj_path);
+}
+
+BOOST_AUTO_TEST_CASE(test01_annotation) {
+    test_annotation_against_expectation("test01.cpp", "test01.json", ccj_path);
 }
 
 BOOST_AUTO_TEST_SUITE_END()
