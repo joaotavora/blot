@@ -49,8 +49,12 @@ endif()
 file(GLOB fixture_sources CONFIGURE_DEPENDS test/fixture/*.cpp)
 add_library(fixture ${fixture_sources})
 
+# Generate test configuration header
+configure_file(test/test_config.h.in test/test_config.h)
+
 # Boost.Test runner
 add_executable(test_blot test/test_blot.cpp)
+target_include_directories(test_blot PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/test)
 target_link_libraries(test_blot PRIVATE
   blot_lib
   Boost::unit_test_framework
@@ -58,4 +62,3 @@ target_link_libraries(test_blot PRIVATE
 
 enable_testing()
 add_test(NAME blot_tests COMMAND test_blot)
-set_tests_properties(blot_tests PROPERTIES WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})

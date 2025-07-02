@@ -7,6 +7,7 @@
 #include <string>
 
 #include "blot/blot.hpp"
+#include "test_config.h"
 
 namespace fs = std::filesystem;
 namespace json = boost::json;
@@ -14,9 +15,11 @@ namespace json = boost::json;
 struct TestFixture {
     fs::path fixture_dir;
     fs::path ccj_path;
+    fs::path original_dir;
     
     TestFixture() {
-        fixture_dir = fs::current_path() / "test" / "fixture";
+        original_dir = fs::current_path();
+        fixture_dir = TEST_FIXTURE_DIR;
         ccj_path = fixture_dir / "compile_commands.json";
         
         // Change to fixture directory for relative path compilation
@@ -25,7 +28,7 @@ struct TestFixture {
     
     ~TestFixture() {
         // Return to original directory
-        fs::current_path(fixture_dir.parent_path().parent_path());
+        fs::current_path(original_dir);
     }
     
     // Load expected JSON file 
