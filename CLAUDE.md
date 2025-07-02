@@ -114,6 +114,9 @@ Note: Single source lines can map to multiple assembly ranges.
   - `* file.cpp (function_name): Rework.`
   - `* CMakeLists.txt (target): Add/Remove/Update setting.`
 - Keep descriptions minimal - focus on WHAT changed, not HOW
+- "Rework" is the default for substantial changes, "Tweak" for minor changes
+- Be more specific when it adds clarity ("Add error handling", "Fix path resolution")
+- Key: stay concise while being appropriately descriptive
 - NO "Co-Authored-By" footers
 
 ### Major Future Challenges
