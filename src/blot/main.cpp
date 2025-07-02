@@ -53,9 +53,6 @@ int main(int argc, char* argv[]) { // NOLINT(*exception*)
     std::ifstream fstream;
     fstream.open(*fopts.asm_file_name);
     input = blot::get_asm(fstream);
-  } else if (!isatty(::fileno(stdin))) {
-    LOG_INFO("Piped input detected");
-    input = blot::get_asm(std::cin);
   } else if (fopts.src_file_name) {
     auto ccj = xpto::blot::find_ccj();
     if (!ccj) {
