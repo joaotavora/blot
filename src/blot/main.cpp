@@ -36,11 +36,12 @@ int main(int argc, char* argv[]) { // NOLINT(*exception*)
 
   LOG_INFO("loglevel={}", loglevel);
 
-  LOG_DEBUG("-pd={}\n-pl={}\n-pc={}\n-pu={}",
+  LOG_DEBUG("-pd={}\n-pl={}\n-pc={}\n-pu={}\n-dm={}",
       aopts.preserve_directives,
       aopts.preserve_library_functions,
       aopts.preserve_comments,
-      aopts.preserve_unused_labels
+      aopts.preserve_unused_labels,
+      aopts.demangle
       );
 
   LOG_DEBUG("asm_file_name={}\nsrc_file_name={}\ncompile_commands_path={}",
