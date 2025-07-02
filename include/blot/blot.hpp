@@ -24,6 +24,7 @@ namespace fs = std::filesystem;
 struct file_options {
   std::optional<fs::path> asm_file_name{};
   std::optional<fs::path> src_file_name{};
+  std::optional<fs::path> compile_commands_path{};
 };
 
 struct annotation_options {

@@ -6,6 +6,7 @@
 #include <boost/asio/readable_pipe.hpp>
 #include <boost/process/v2/process.hpp>
 #include <boost/process/v2/stdio.hpp>
+#include <boost/process/v2/start_dir.hpp>
 #include <boost/system/detail/error_code.hpp>
 #include <filesystem>
 #include <string>
@@ -69,9 +70,19 @@ std::string get_asm(
   asio::io_context ctx;
   asio::readable_pipe rp{ctx};
   std::string output{};
+  boost::filesystem::path work_dir(directory.string()); // Convert to boost::filesystem::path
+  LOG_INFO("Running compiler {}:\nargs: {}\nworkdir: {}", compiler,
+    [&](){
+        std::string res{compiler};
+        res.reserve(command.length());
+        for (const auto& a : args) {res+= " "; res += a;}
+        return res;
+    }(),
+      work_dir.c_str());
   p2::process proc{
     ctx, compiler, args,
-    p2::process_stdio{.in = nullptr, .out = rp, .err = nullptr}};
+    p2::process_stdio{.in = nullptr, .out = rp, .err = nullptr},
+    p2::process_start_dir{work_dir}};
   boost::system::error_code ec;
   asio::read(rp, asio::dynamic_buffer(output), ec);
   assert(!ec || (ec == asio::error::eof));
