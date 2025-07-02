@@ -43,9 +43,10 @@ int main(int argc, char* argv[]) { // NOLINT(*exception*)
       aopts.preserve_unused_labels
       );
 
-  LOG_DEBUG("asm_file_name={}\nsrc_file_name={}",
+  LOG_DEBUG("asm_file_name={}\nsrc_file_name={}\ncompile_commands_path={}",
       fopts.asm_file_name,
-      fopts.src_file_name
+      fopts.src_file_name,
+      fopts.compile_commands_path
       );
 
   xpto::logger::set_level(static_cast<xpto::logger::level>(loglevel));
@@ -58,18 +59,26 @@ int main(int argc, char* argv[]) { // NOLINT(*exception*)
     fstream.open(*fopts.asm_file_name);
     input = slurp(fstream);
   } else if (fopts.src_file_name) {
-    auto ccj = xpto::blot::find_ccj();
-    if (!ccj) {
-      LOG_ERROR("Can't find compile_commands.json");
-      return -1;
+    fs::path ccj_path;
+    if (fopts.compile_commands_path) {
+      ccj_path = *fopts.compile_commands_path;
+      LOG_INFO("Using provided compile_commands.json: {}", ccj_path);
+    } else {
+      auto ccj = xpto::blot::find_ccj();
+      if (!ccj) {
+        LOG_ERROR("Can't find compile_commands.json");
+        return -1;
+      }
+      ccj_path = *ccj;
+      LOG_INFO("Detected {}", ccj_path);
     }
-    LOG_INFO("Detected {}", *ccj);
-    auto cmd = xpto::blot::find_compile_command(*ccj, *fopts.src_file_name);
+    auto cmd = xpto::blot::find_compile_command(ccj_path, *fopts.src_file_name);
     if (!cmd) {
       LOG_ERROR("Can't find an entry for {}", *fopts.src_file_name);
       return -1;
     }
     LOG_INFO("Got this command '{}'", cmd->command);
+
     input = xpto::blot::get_asm(cmd->directory, cmd->command, cmd->file);
   } else {
     LOG_INFO("Reading from stdin");

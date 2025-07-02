@@ -42,6 +42,10 @@ std::optional<int> parse_options(
       "--asm-file",
       fopts.asm_file_name,
       "Read assembly directly from file");
+  app.add_option(
+      "--compile_commands,--ccj",
+      fopts.compile_commands_path,
+      "Path to compile_commands.json file");
   app.add_flag(
       "--json", json_output,
       "Output results in JSON format")
