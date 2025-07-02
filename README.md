@@ -11,8 +11,8 @@ central building block in :
   https://github.com/joaotavora/beardbolt, but much faster and more
   powerful.
   
-* project browsers within code forges.
-
+* no-editing project source code browsers (for example inside code
+  forges)
 
 ## Build and Usage
 
@@ -27,15 +27,18 @@ Blot can process assembly from three sources:
 
 1. **Source files** (requires entry in `compile_commands.json`): 
    ```bash
-   build-Debug/blot test/test01.cpp
+   cd test/fixture && ../../build-Debug/blot test01.cpp
    ```
-   This uses your project's actual build configuration to compile the source file and generate assembly.
+   
+   This uses your project's actual build configuration to compile the
+   source file and generate assembly.
 
 2. **Assembly files**: 
    ```bash
    echo 'int main() { return 42; }' | g++ -S -g -x c++ - -o file.s
    build-Debug/blot --asm-file=file.s
    ```
+   
    Read assembly directly from a pre-generated file.
 
 3. **Piped input**: 
@@ -46,7 +49,40 @@ Blot can process assembly from three sources:
 
 Add `--json` for structured output with line mappings.
 
-This should produce assembly output similar to Compiler Explorer: 
+This should produce assembly output similar to Compiler Explorer:
+
+## Development Status
+
+### Completed Features
+- ✅ **Basic assembly annotation** with source-to-assembly line mappings
+- ✅ **JSON output format** for programmatic access (`--json` flag)
+- ✅ **Automated testing framework** with Boost.Test integration
+- ✅ **Library architecture** - separation between `libblot` (core) and 
+  `blot` (CLI)
+- ✅ **Three input modes** - source files, assembly files, piped input
+
+### Roadmap
+
+#### Phase 1: Core Functionality
+1. **Expand test coverage** - achieve parity with Compiler Explorer filtering
+2. **Auto-demangling support** - integrate with `c++filt` or similar tools
+3. **Compilation error handling** - decide where and how to display errors
+
+#### Phase 2: Header File Support
+4. **Header file annotation** - heuristically find "includer" translation 
+   units that instantiate templates from header files
+5. **Inclusion graph walking** - analyze #include dependencies to find 
+   suitable compilation targets
+
+#### Phase 3: Live Editing Support  
+6. **Virtual file system** - trick compilers into seeing in-memory file 
+   representations as filesystem files
+7. **Unsaved buffer support** - enable live assembly updates without saving 
+   files (critical for editor integration)
+
+The last challenge is particularly complex as no known compiler supports 
+compiling filesystem-based translation units while substituting specific 
+#included headers with piped input. 
 
 ```
 main:
