@@ -106,8 +106,15 @@ The project includes test files in `test/` directory that are compiled into a fi
 Note: Single source lines can map to multiple assembly ranges.
 
 ### Commit Style
-- Use GNU ChangeLog format with file-level entries
-- Structure: headline, explanation paragraphs, then `* file.cpp (function): Change.`
+- Use GNU ChangeLog format with concise file-level entries
+- Structure: headline + brief explanation (1-2 sentences max) + file breakdown
+- File-by-file patterns:
+  - `* path/file.ext: New file.`
+  - `* file.cpp: Include header.h.`  
+  - `* file.cpp (function_name): Rework.`
+  - `* CMakeLists.txt (target): Add/Remove/Update setting.`
+- Keep descriptions minimal - focus on WHAT changed, not HOW
+- NO "Co-Authored-By" footers
 
 ### Major Future Challenges
 
