@@ -18,8 +18,7 @@ find_package(Fmt REQUIRED)
 find_package(CLI11 REQUIRED)
 
 # Core blot library
-file(GLOB lib_sources CONFIGURE_DEPENDS src/blot/*.cpp)
-list(REMOVE_ITEM lib_sources ${CMAKE_CURRENT_SOURCE_DIR}/src/blot/main.cpp)
+file(GLOB lib_sources CONFIGURE_DEPENDS src/libblot/*.cpp)
 add_library(blot_lib ${lib_sources})
 target_include_directories(blot_lib PUBLIC include)
 target_link_libraries(blot_lib PUBLIC
@@ -32,8 +31,13 @@ target_link_libraries(blot_lib PUBLIC
 target_compile_definitions(blot_lib PUBLIC LOG_NO_TIMESTAMP ON)
 
 # Main executable
-add_executable(blot_exe src/blot/main.cpp)
-target_link_libraries(blot_exe PRIVATE blot_lib)
+file(GLOB blot_sources CONFIGURE_DEPENDS src/blot/*.cpp)
+add_executable(blot_exe ${blot_sources})
+target_include_directories(blot_exe PRIVATE include)
+target_link_libraries(blot_exe PRIVATE 
+  blot_lib
+  CLI11::CLI11
+)
 set_target_properties(blot_exe PROPERTIES OUTPUT_NAME blot)
 
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
