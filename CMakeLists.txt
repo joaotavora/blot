@@ -58,3 +58,4 @@ target_link_libraries(test_blot PRIVATE
 
 enable_testing()
 add_test(NAME blot_tests COMMAND test_blot)
+set_tests_properties(blot_tests PROPERTIES WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
