@@ -1,7 +1,5 @@
-#include "assembly.hpp"
 #include "blot/blot.hpp"
 #include "blot/logger.hpp"
-#include "ccj.hpp"
 #include "options.hpp"
 
 #include <re2/re2.h>
@@ -26,6 +24,12 @@ int main(int argc, char* argv[]) { // NOLINT(*exception*)
   xpto::blot::annotation_options aopts{};
   int loglevel{3};
   bool json_output{false};
+  
+  auto slurp = [](std::istream& in) -> std::string {
+    return std::string{std::istreambuf_iterator<char>{in}, 
+                       std::istreambuf_iterator<char>()};
+  };
+  
   auto done = parse_options(
       std::span(argv, argc), loglevel, fopts, aopts, json_output);
   if (done) return done.value();
@@ -52,7 +56,7 @@ int main(int argc, char* argv[]) { // NOLINT(*exception*)
     LOG_INFO("Reading from {}", *fopts.asm_file_name);
     std::ifstream fstream;
     fstream.open(*fopts.asm_file_name);
-    input = blot::get_asm(fstream);
+    input = slurp(fstream);
   } else if (fopts.src_file_name) {
     auto ccj = xpto::blot::find_ccj();
     if (!ccj) {
@@ -69,7 +73,7 @@ int main(int argc, char* argv[]) { // NOLINT(*exception*)
     input = xpto::blot::get_asm(cmd->directory, cmd->command, cmd->file);
   } else {
     LOG_INFO("Reading from stdin");
-    input = blot::get_asm(std::cin);
+    input = slurp(std::cin);
   }
 
   LOG_INFO("Annotating {} bytes of asm", input.length());

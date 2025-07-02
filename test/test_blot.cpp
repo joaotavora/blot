@@ -7,8 +7,6 @@
 #include <string>
 
 #include "blot/blot.hpp"
-#include "../src/blot/ccj.hpp"
-#include "../src/blot/assembly.hpp"
 
 namespace fs = std::filesystem;
 namespace json = boost::json;

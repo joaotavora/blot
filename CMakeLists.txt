@@ -17,18 +17,24 @@ find_package(Boost REQUIRED COMPONENTS process json unit_test_framework)
 find_package(Fmt REQUIRED)
 find_package(CLI11 REQUIRED)
 
-file(GLOB sources CONFIGURE_DEPENDS src/blot/*.cpp)
-add_executable(blot_exe ${sources})
-target_include_directories(blot_exe PRIVATE include)
-target_link_libraries(blot_exe PRIVATE
+# Core blot library
+file(GLOB lib_sources CONFIGURE_DEPENDS src/blot/*.cpp)
+list(REMOVE_ITEM lib_sources ${CMAKE_CURRENT_SOURCE_DIR}/src/blot/main.cpp)
+add_library(blot_lib ${lib_sources})
+target_include_directories(blot_lib PUBLIC include)
+target_link_libraries(blot_lib PUBLIC
   re2::re2
   Boost::headers
   Boost::process
   Boost::json
   fmt::fmt
 )
+target_compile_definitions(blot_lib PUBLIC LOG_NO_TIMESTAMP ON)
+
+# Main executable
+add_executable(blot_exe src/blot/main.cpp)
+target_link_libraries(blot_exe PRIVATE blot_lib)
 set_target_properties(blot_exe PROPERTIES OUTPUT_NAME blot)
-target_compile_definitions(blot_exe PRIVATE LOG_NO_TIMESTAMP ON)
 
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
   target_compile_options(blot_exe PRIVATE "-fsanitize=address,undefined")
@@ -40,21 +46,11 @@ file(GLOB fixture_sources CONFIGURE_DEPENDS test/fixture/*.cpp)
 add_library(fixture ${fixture_sources})
 
 # Boost.Test runner
-add_executable(test_blot 
-  test/test_blot.cpp
-  src/blot/ccj.cpp
-  src/blot/assembly.cpp
-)
-target_include_directories(test_blot PRIVATE include)
+add_executable(test_blot test/test_blot.cpp)
 target_link_libraries(test_blot PRIVATE
-  re2::re2
-  Boost::headers
-  Boost::process
-  Boost::json
+  blot_lib
   Boost::unit_test_framework
-  fmt::fmt
 )
-target_compile_definitions(test_blot PRIVATE LOG_NO_TIMESTAMP ON)
 
 enable_testing()
 add_test(NAME blot_tests COMMAND test_blot)

@@ -14,6 +14,8 @@
 
 #include "linespan.hpp"
 #include "logger.hpp"
+#include "ccj.hpp"
+#include "assembly.hpp"
 
 namespace xpto::blot {
 
@@ -30,6 +32,7 @@ struct annotation_options {
   bool preserve_library_functions{};
   bool preserve_unused_labels{};
 };
+
 
 using linum_t = size_t;
 using linemap_t = std::map<linum_t, std::set<std::pair<linum_t, linum_t>>>;

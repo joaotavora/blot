@@ -1,4 +1,4 @@
-#include "assembly.hpp"
+#include "blot/assembly.hpp"
 
 #include <boost/asio/buffer.hpp>
 #include <boost/asio/io_context.hpp>
@@ -79,10 +79,5 @@ std::string get_asm(
   return output;
 }
 
-// Get asm from a stream
-std::string get_asm(std::istream& in) {
-  return std::string{
-    std::istreambuf_iterator<char>{in}, std::istreambuf_iterator<char>()};
-}
 
 }  // namespace xpto::blot

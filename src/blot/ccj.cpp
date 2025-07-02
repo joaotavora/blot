@@ -1,4 +1,4 @@
-#include "ccj.hpp"
+#include "blot/ccj.hpp"
 
 #include <boost/filesystem.hpp>
 #include <boost/json.hpp>
