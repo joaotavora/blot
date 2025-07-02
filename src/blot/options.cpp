@@ -11,7 +11,8 @@ namespace xpto::blot {
 std::optional<int> parse_options(
     std::span<char*> args, int& loglevel,
     xpto::blot::file_options& fopts,
-    xpto::blot::annotation_options& aopts) {
+    xpto::blot::annotation_options& aopts,
+    bool& json_output) {
   CLI::App app{"Compiler explorer-like util"};
 
   app.allow_non_standard_option_names();
@@ -41,6 +42,10 @@ std::optional<int> parse_options(
       "--asm-file",
       fopts.asm_file_name,
       "Read assembly directly from file");
+  app.add_flag(
+      "--json", json_output,
+      "Output results in JSON format")
+    ->capture_default_str();
   app.add_option(
       "source-file",
       fopts.src_file_name,

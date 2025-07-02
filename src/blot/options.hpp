@@ -12,5 +12,6 @@ namespace xpto::blot {
 std::optional<int> parse_options(
     std::span<char*> args, int& loglevel,
     xpto::blot::file_options& fopts,
-    xpto::blot::annotation_options& aopts);
+    xpto::blot::annotation_options& aopts,
+    bool& json_output);
 }

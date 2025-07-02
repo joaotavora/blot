@@ -18,15 +18,16 @@
 
 namespace fs = std::filesystem;
 namespace blot = xpto::blot;
+namespace json = boost::json;
 
 
 int main(int argc, char* argv[]) { // NOLINT(*exception*)
   xpto::blot::file_options fopts;
   xpto::blot::annotation_options aopts{};
   int loglevel{3};
-
+  bool json_output{false};
   auto done = parse_options(
-      std::span(argv, argc), loglevel, fopts, aopts);
+      std::span(argv, argc), loglevel, fopts, aopts, json_output);
   if (done) return done.value();
 
   LOG_INFO("loglevel={}", loglevel);
@@ -76,17 +77,33 @@ int main(int argc, char* argv[]) { // NOLINT(*exception*)
 
   LOG_INFO("Annotating {} bytes of asm", input.length());
   auto result = xpto::blot::annotate(input, aopts);
-  for (auto&& l : result.output)
-    std::cout << l << "\n";
-
-
-  LOG_INFO("And now the linemap");
   
-  for (auto&& x : result.linemap) {
-    std::cout << x.first << ": ";
-    for (auto&& [y1, y2] : x.second) {
-      std::cout << "[" << y1 << "," << y2 << "]" << " ";
+  if (json_output) {
+    json::object json_result;
+    json::array assembly_lines;
+    
+    for (auto&& line : result.output) {
+      assembly_lines.push_back(json::value(line));
     }
-    std::cout << "\n";
+    
+    json::array line_mappings;
+    for (auto&& [src_line, asm_ranges] : result.linemap) {
+      for (auto&& [asm_start, asm_end] : asm_ranges) {
+        json::object mapping;
+        mapping["source_line"] = src_line;
+        mapping["asm_start"] = asm_start;
+        mapping["asm_end"] = asm_end;
+        line_mappings.push_back(mapping);
+      }
+    }
+    
+    json_result["assembly"] = assembly_lines;
+    json_result["line_mappings"] = line_mappings;
+    
+    std::cout << json::serialize(json_result) << std::endl;
+  } else {
+    for (auto&& line : result.output) {
+      std::cout << line << "\n";
+    }
   }
 }
