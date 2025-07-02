@@ -1,6 +1,7 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to Claude Code (claude.ai/code) when
+working with code in this repository.
 
 ## Build System & Commands
 
@@ -19,15 +20,19 @@ BUILD_DIR=build-$BUILD_TYPE
 cmake -B $BUILD_DIR -DCMAKE_BUILD_TYPE=$BUILD_TYPE
 cmake --build $BUILD_DIR -j
 
-# Run the tool
-$BUILD_DIR/blot --debug=3 test/test01.cpp
+# Run the tool (see README for more ways to run it)
+echo 'int main() { return 42; }' | g++ -S -g -x c++ - -o - | build-Debug/blot
 ```
 
-The project generates `compile_commands.json` automatically in both build directories, with a symlink at the project root pointing to `build-Release/compile_commands.json`.
+The project generates `compile_commands.json` automatically in both
+build directories, with a symlink at the project root pointing to
+`build-Release/compile_commands.json`.
 
 ## Project Architecture
 
-**Blot** is a compiler-explorer clone that works with your local toolchain and project. It processes assembly output to create annotated, cleaned assembly with source-to-assembly line mappings.
+**Blot** is a compiler-explorer clone that works with your local
+toolchain and project. It processes assembly output to create
+annotated, cleaned assembly with source-to-assembly line mappings.
 
 ### Core Components
 
@@ -48,9 +53,13 @@ The project generates `compile_commands.json` automatically in both build direct
 
 ### Processing Pipeline
 
-1. **Input Resolution**: Source file → compile command → assembly generation, or direct assembly input
-2. **First Pass**: Parse assembly to identify functions, labels, and source mappings
-3. **Intermediate**: Determine which symbols to preserve based on options
+1. **Input Resolution**: Source file → compile command → assembly
+   generation, direct assembly input from passed-in filename or from
+   stdin.
+2. **First Pass**: Parse assembly to identify functions, labels, and
+   source mappings
+3. **Intermediate**: Determine which symbols to preserve based on
+   options
 4. **Second Pass**: Generate clean output with line mappings
 
 ### Dependencies
@@ -93,6 +102,7 @@ The project includes test files in `test/` directory that are compiled into a fi
   }
 }
 ```
+
 Note: Single source lines can map to multiple assembly ranges.
 
 ### Commit Style
