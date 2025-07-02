@@ -14,18 +14,39 @@ central building block in :
 * project browsers within code forges.
 
 
-## Some basic usage:
+## Build and Usage
 
-```
-BUILD_TYPE=Debug                                        &&
-BUILD_DIR=build-$BUILD_TYPE                             &&
-cmake -B $BUILD_DIR -DCMAKE_BUILD_TYPE=$BUILD_TYPE      &&
-cmake --build $BUILD_DIR -j                             &&
-$BUILD_DIR/blot --debug=3 test/test01.cpp
+```bash
+BUILD_TYPE=Debug
+BUILD_DIR=build-$BUILD_TYPE
+cmake -B $BUILD_DIR -DCMAKE_BUILD_TYPE=$BUILD_TYPE
+cmake --build $BUILD_DIR -j
 ```
 
-This should produce (among log lines and etc) some assembly output not
-far from what Compiler Explorer shows for the same snippet. 
+Blot can process assembly from three sources:
+
+1. **Source files** (requires entry in `compile_commands.json`): 
+   ```bash
+   build-Debug/blot test/test01.cpp
+   ```
+   This uses your project's actual build configuration to compile the source file and generate assembly.
+
+2. **Assembly files**: 
+   ```bash
+   echo 'int main() { return 42; }' | g++ -S -g -x c++ - -o file.s
+   build-Debug/blot --asm-file=file.s
+   ```
+   Read assembly directly from a pre-generated file.
+
+3. **Piped input**: 
+   ```bash
+   echo 'int main() { return 42; }' | g++ -S -g -x c++ - -o - | build-Debug/blot
+   ```
+   Process assembly streamed from standard input.
+
+Add `--json` for structured output with line mappings.
+
+This should produce assembly output similar to Compiler Explorer: 
 
 ```
 main:
