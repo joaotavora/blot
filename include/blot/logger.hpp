@@ -47,6 +47,7 @@ inline void log(
   if (level > global_level) return;
 
   fmt::println(
+      stderr,
 #ifndef LOG_NO_TIMESTAMP
       "{} "
 #endif
