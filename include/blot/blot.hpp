@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cxxabi.h>
 #include <re2/re2.h>
 
 #include <array>
@@ -12,10 +13,10 @@
 #include <unordered_map>
 #include <unordered_set>
 
+#include "assembly.hpp"
+#include "ccj.hpp"
 #include "linespan.hpp"
 #include "logger.hpp"
-#include "ccj.hpp"
-#include "assembly.hpp"
 
 namespace xpto::blot {
 
@@ -32,8 +33,8 @@ struct annotation_options {
   bool preserve_comments{};
   bool preserve_library_functions{};
   bool preserve_unused_labels{};
+  bool demangle{};
 };
-
 
 using linum_t = size_t;
 using linemap_t = std::map<linum_t, std::set<std::pair<linum_t, linum_t>>>;
@@ -61,14 +62,7 @@ constexpr auto make_pointer_array(std::array<T, N>& values) {
   return make_pointer_array_impl<Dest>(values, std::make_index_sequence<N>{});
 }
 
-inline std::optional<size_t> to_size_t(std::string_view sv) {
-  size_t result{};
-  auto [ptr, ec] = std::from_chars(sv.begin(), sv.end(), result);
-  if (ec == std::errc{} && ptr == sv.end())
-    return result;
-  else
-    return std::nullopt;
-}
+std::optional<size_t> to_size_t(std::string_view sv);
 
 }  // namespace utils
 
@@ -156,7 +150,8 @@ struct parser_state {
   linemap_t linemap{};
 
   void register_mapping(linum_t source_linum, linum_t asm_linum) {
-    auto [probe, inserted] = linemap.insert({source_linum, {{asm_linum, asm_linum}}});
+    auto [probe, inserted] =
+        linemap.insert({source_linum, {{asm_linum, asm_linum}}});
     if (!inserted) {
       auto& set = probe->second;
       auto y = set.begin();
@@ -165,7 +160,7 @@ struct parser_state {
           set.emplace(asm_linum, x->second);
           set.erase(x);
         } else if (asm_linum == x->second + 1) {
-          if (y != set.end() && y->first -1 == asm_linum){
+          if (y != set.end() && y->first - 1 == asm_linum) {
             set.emplace(x->first, y->second);
             set.erase(x);
             set.erase(y);
@@ -273,33 +268,14 @@ auto first_pass(
   return output;
 }
 
-inline void intermediate(parser_state& s, const annotation_options& o) {
-  if (!s.main_file_tag)
-    throw std::runtime_error("Cannot proceed without a 'main_file_tag'");
-  if (o.preserve_library_functions) {
-    for (auto&& [label, callees] : s.routines) {
-      s.used_labels.insert(label);
-      for (auto&& callee : callees) {
-        s.used_labels.insert(callee);
-      }
-    }
-  } else {
-    for (auto&& label : s.main_file_routines) {
-      s.used_labels.insert(label);
-      for (auto&& callee : s.routines[label]) {
-        s.used_labels.insert(callee);
-      }
-    }
-  }
-}
+void intermediate(parser_state& s, const annotation_options& o);
 
 annotation_result second_pass(
     const auto& input, parser_state& s, const annotation_options& options) {
   std::optional<label_t> reachable_label{};
   std::optional<size_t> source_linum{};
 
-  using output_t =
-    std::vector<std::string>;
+  using output_t = std::vector<std::string>;
   output_t output;
 
   sweeping(
@@ -375,13 +351,6 @@ annotation_result second_pass(
 
 }  // namespace detail
 
-inline annotation_result annotate(
-    std::span<const char> input, const annotation_options& options) {
-  xpto::linespan lspan{input};
-  detail::parser_state state{};
-
-  auto fp_output = detail::first_pass(lspan, state, options);
-  detail::intermediate(state, options);
-  return detail::second_pass(fp_output, state, options);
-}
+annotation_result annotate(
+    std::span<const char> input, const annotation_options& options);
 }  // namespace xpto::blot
