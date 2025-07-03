@@ -43,13 +43,21 @@ annotated, cleaned assembly with source-to-assembly line mappings.
 
 ### Key Modules
 
-- `src/blot/main.cpp` - Entry point and workflow orchestration
-- `include/blot/blot.hpp` - Core annotation engine with two-pass processing
-- `src/blot/ccj.{hpp,cpp}` - `compile_commands.json` parsing and lookup
-- `src/blot/assembly.{hpp,cpp}` - Assembly generation from compiler commands
-- `src/blot/options.{hpp,cpp}` - CLI argument parsing
-- `include/blot/logger.hpp` - Logging infrastructure
-- `include/blot/linespan.hpp` - Efficient line-based text processing
+#### Public API (`include/blot/`)
+- `blot.hpp` - Core annotation interface and types
+- `assembly.hpp` - Assembly generation interface  
+- `ccj.hpp` - Compile commands interface
+
+#### Implementation (`src/libblot/`)
+- `blot.cpp` - Core annotation engine with two-pass processing and C++ demangling
+- `assembly.cpp` - Assembly generation from compiler commands
+- `ccj.cpp` - `compile_commands.json` parsing and lookup
+- `logger.hpp` - Internal logging infrastructure
+- `linespan.hpp` - Internal line-based text processing utility
+
+#### Application (`src/blot/`)
+- `main.cpp` - Entry point and workflow orchestration
+- `options.{hpp,cpp}` - CLI argument parsing and file options
 
 ### Processing Pipeline
 
@@ -82,10 +90,12 @@ The project includes test files in `test/` directory that are compiled into a fi
 ## Development Practices & Future Work
 
 ### Code Organization
-- **`src/libblot/`**: Core reusable functionality (assembly, ccj)
-- **`src/blot/`**: Program-specific code (main, options)
-- **`include/blot/`**: Public API headers with clean separation
+- **`include/blot/`**: Public API headers only (blot.hpp, assembly.hpp, ccj.hpp)
+- **`src/libblot/`**: Core implementation (blot.cpp, assembly.cpp, ccj.cpp) and internal utilities (logger.hpp, linespan.hpp)
+- **`src/blot/`**: Application-specific code (main.cpp, options.{hpp,cpp})
 - **`test/fixture/`**: Test files with dedicated compile_commands.json
+
+The architecture enforces clean separation between public interface and implementation details. Users of the library only need to include headers from `include/blot/`, while all internal utilities and implementation are encapsulated in `src/libblot/`.
 
 ### Testing Strategy
 - Automated tests compare `xpto::blot::annotate()` output against expected JSON
