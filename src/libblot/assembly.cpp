@@ -12,7 +12,7 @@
 #include <string>
 #include <vector>
 
-#include "blot/logger.hpp"
+#include "logger.hpp"
 
 namespace xpto::blot {
 
