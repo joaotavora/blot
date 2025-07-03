@@ -37,9 +37,9 @@ int main(int argc, char* argv[]) {  // NOLINT(*exception*)
   LOG_INFO("loglevel={}", loglevel);
 
   LOG_DEBUG(
-      "-pd={}\n-pl={}\n-pc={}\n-pu={}\n-dm={}", aopts.preserve_directives,
+      "-pd={}\n-pl={}\n-pc={}\n-pu={}", aopts.preserve_directives,
       aopts.preserve_library_functions, aopts.preserve_comments,
-      aopts.preserve_unused_labels, aopts.demangle);
+      aopts.preserve_unused_labels);
 
   LOG_DEBUG(
       "asm_file_name={}\nsrc_file_name={}\ncompile_commands_path={}",
@@ -89,7 +89,7 @@ int main(int argc, char* argv[]) {  // NOLINT(*exception*)
     json::array assembly_lines;
 
     for (auto&& line : result.output) {
-      assembly_lines.push_back(json::value(line));
+      assembly_lines.push_back(json::value(std::string{line}));
     }
 
     json::array line_mappings;

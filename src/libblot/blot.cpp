@@ -2,7 +2,6 @@
 #include "linespan.hpp"
 #include "logger.hpp"
 
-#include <cxxabi.h>
 #include <re2/re2.h>
 
 #include <stdexcept>
@@ -268,7 +267,7 @@ annotation_result second_pass(
   std::optional<label_t> reachable_label{};
   std::optional<size_t> source_linum{};
 
-  using output_t = std::vector<std::string>;
+  using output_t = std::vector<std::string_view>;
   output_t output;
 
   sweeping(
@@ -344,41 +343,6 @@ annotation_result second_pass(
 
 }  // namespace detail
 
-// Demangle C++ symbols using __cxa_demangle
-std::string demangle_symbol(std::string_view mangled) {
-  int status = 0;
-  std::string result{mangled};
-  char* demangled =
-      abi::__cxa_demangle(result.c_str(), nullptr, nullptr, &status);
-  if (status == 0 && demangled) {
-    result = demangled;
-    std::free(demangled);  // NOLINT
-  }
-  return result;
-}
-
-// Demangle C++ symbols in assembly line
-std::string demangle_line(std::string_view line) {
-  std::string result;
-  std::string_view::const_iterator last_pos = line.begin();
-  re2::StringPiece match;
-
-  while (RE2::FindAndConsume(&line, "(_Z[A-Za-z0-9_]+)", &match)) {
-    // Append text from last position to start of match
-    result.append(last_pos, match.begin());
-
-    // Demangle and append the symbol
-    result.append(demangle_symbol(match));
-
-    // Update last position to end of match
-    last_pos = match.end();
-  }
-
-  // Append remaining text
-  result.append(last_pos, line.end());
-
-  return result;
-}
 
 annotation_result annotate(
     std::span<const char> input, const annotation_options& options) {
@@ -387,16 +351,7 @@ annotation_result annotate(
 
   auto fp_output = detail::first_pass(lspan, state, options);
   detail::intermediate(state, options);
-  auto result = detail::second_pass(fp_output, state, options);
-
-  // Apply demangling to final output if requested
-  if (options.demangle) {
-    for (auto& line : result.output) {
-      line = demangle_line(line);
-    }
-  }
-
-  return result;
+  return detail::second_pass(fp_output, state, options);
 }
 
 }  // namespace xpto::blot

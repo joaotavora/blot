@@ -33,10 +33,6 @@ std::optional<int> parse_options(
       "-pl,--preserve-library-functions", aopts.preserve_library_functions,
       "preserve library functions")
     ->capture_default_str();
-  app.add_flag(
-      "--demangle", aopts.demangle,
-      "demangle C++ symbols")
-    ->capture_default_str();
   app.add_option(
       "-d, --debug",
       loglevel,
