@@ -2,6 +2,7 @@
 #include "linespan.hpp"
 #include "logger.hpp"
 
+#include <cxxabi.h>
 #include <re2/re2.h>
 
 #include <stdexcept>
@@ -36,11 +37,26 @@ std::optional<size_t> to_size_t(std::string_view sv) {
   else
     return std::nullopt;
 }
+
+// Demangle C++ symbols using __cxa_demangle
+std::string demangle_symbol(std::string_view mangled) {
+  int status = 0;
+  std::string result{mangled};
+  char* demangled =
+      abi::__cxa_demangle(result.c_str(), nullptr, nullptr, &status);
+  if (status == 0 && demangled) {
+    result = demangled;
+    std::free(demangled);  // NOLINT
+  }
+  return result;
+}
+
 }  // namespace utils
 
 template <typename Output, typename Input, typename F>
 void sweeping(
-    const Input& input, Output& output, const annotation_options& o, F fn) {
+    const Input& input, Output& output, const annotation_options& o, F fn,
+    std::vector<std::pair<std::string_view, std::string>>* demanglings = nullptr) {
   size_t linum{1};
 
   std::array<match_t, 10> matches;
@@ -52,6 +68,25 @@ void sweeping(
 
     auto preserve = [&]() {
       linum++;
+      
+      // Collect demangling information if requested
+      if (o.demangle && demanglings) {
+        std::string_view line = *it;
+        re2::StringPiece input_piece(line.data(), line.size());
+        re2::StringPiece match;
+        
+        // Find all mangled symbols in this line
+        while (RE2::FindAndConsume(&input_piece, R"((_Z[A-Za-z0-9_]+))", &match)) {
+          std::string_view mangled_sv(match.data(), match.size());
+          std::string demangled = utils::demangle_symbol(mangled_sv);
+          
+          // Only store if demangling actually changed the symbol
+          if (demangled != mangled_sv) {
+            demanglings->emplace_back(mangled_sv, std::move(demangled));
+          }
+        }
+      }
+      
       output.emplace_back(*it);
       ++it;
       done = true;
@@ -269,6 +304,8 @@ annotation_result second_pass(
 
   using output_t = std::vector<std::string_view>;
   output_t output;
+  
+  std::vector<std::pair<std::string_view, std::string>> demanglings;
 
   sweeping(
       input, output, options,
@@ -337,8 +374,8 @@ annotation_result second_pass(
             reachable_label = std::nullopt;
           }
         }
-      });
-  return {output, s.linemap};
+      }, &demanglings);
+  return {output, s.linemap, demanglings};
 }
 
 }  // namespace detail
