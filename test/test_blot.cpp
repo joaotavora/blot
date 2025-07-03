@@ -6,6 +6,9 @@
 #include <string>
 
 #include "blot/blot.hpp"
+#include "blot/ccj.hpp"
+#include "blot/assembly.hpp"
+
 #include "test_config.h"
 
 namespace fs = std::filesystem;

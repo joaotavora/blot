@@ -9,7 +9,7 @@
 #include <optional>
 
 
-#include "blot/logger.hpp"
+#include "logger.hpp"
 
 namespace xpto::blot {
 

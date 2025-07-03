@@ -1,54 +1,49 @@
+#include "blot/assembly.hpp"
 #include "blot/blot.hpp"
-#include "blot/logger.hpp"
+#include "blot/ccj.hpp"
+#include "../libblot/logger.hpp"
 #include "options.hpp"
 
+#include <fmt/std.h>
 #include <re2/re2.h>
 #include <unistd.h>
-
-#include <fmt/std.h>
+#include <boost/json.hpp>
+#include <CLI/CLI.hpp>
 
 #include <fstream>
 #include <iostream>
 #include <optional>
 #include <span>
 
-#include <CLI/CLI.hpp>
-
 namespace fs = std::filesystem;
 namespace blot = xpto::blot;
 namespace json = boost::json;
 
-
-int main(int argc, char* argv[]) { // NOLINT(*exception*)
+int main(int argc, char* argv[]) {  // NOLINT(*exception*)
   xpto::blot::file_options fopts;
   xpto::blot::annotation_options aopts{};
   int loglevel{3};
   bool json_output{false};
-  
+
   auto slurp = [](std::istream& in) -> std::string {
-    return std::string{std::istreambuf_iterator<char>{in}, 
-                       std::istreambuf_iterator<char>()};
+    return std::string{
+      std::istreambuf_iterator<char>{in}, std::istreambuf_iterator<char>()};
   };
-  
-  auto done = parse_options(
-      std::span(argv, argc), loglevel, fopts, aopts, json_output);
+
+  auto done =
+      parse_options(std::span(argv, argc), loglevel, fopts, aopts, json_output);
   if (done) return done.value();
 
   LOG_INFO("loglevel={}", loglevel);
 
-  LOG_DEBUG("-pd={}\n-pl={}\n-pc={}\n-pu={}\n-dm={}",
-      aopts.preserve_directives,
-      aopts.preserve_library_functions,
-      aopts.preserve_comments,
-      aopts.preserve_unused_labels,
-      aopts.demangle
-      );
+  LOG_DEBUG(
+      "-pd={}\n-pl={}\n-pc={}\n-pu={}\n-dm={}", aopts.preserve_directives,
+      aopts.preserve_library_functions, aopts.preserve_comments,
+      aopts.preserve_unused_labels, aopts.demangle);
 
-  LOG_DEBUG("asm_file_name={}\nsrc_file_name={}\ncompile_commands_path={}",
-      fopts.asm_file_name,
-      fopts.src_file_name,
-      fopts.compile_commands_path
-      );
+  LOG_DEBUG(
+      "asm_file_name={}\nsrc_file_name={}\ncompile_commands_path={}",
+      fopts.asm_file_name, fopts.src_file_name, fopts.compile_commands_path);
 
   xpto::logger::set_level(static_cast<xpto::logger::level>(loglevel));
 
@@ -88,15 +83,15 @@ int main(int argc, char* argv[]) { // NOLINT(*exception*)
 
   LOG_INFO("Annotating {} bytes of asm", input.length());
   auto result = xpto::blot::annotate(input, aopts);
-  
+
   if (json_output) {
     json::object json_result;
     json::array assembly_lines;
-    
+
     for (auto&& line : result.output) {
       assembly_lines.push_back(json::value(line));
     }
-    
+
     json::array line_mappings;
     for (auto&& [src_line, asm_ranges] : result.linemap) {
       for (auto&& [asm_start, asm_end] : asm_ranges) {
@@ -107,11 +102,11 @@ int main(int argc, char* argv[]) { // NOLINT(*exception*)
         line_mappings.push_back(mapping);
       }
     }
-    
+
     json_result["assembly"] = assembly_lines;
     json_result["line_mappings"] = line_mappings;
-    
-    std::cout << json::serialize(json_result) << std::endl;
+
+    std::cout << json::serialize(json_result) << "\n";
   } else {
     for (auto&& line : result.output) {
       std::cout << line << "\n";
