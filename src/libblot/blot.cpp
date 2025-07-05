@@ -1,6 +1,4 @@
 #include "blot/blot.hpp"
-#include "linespan.hpp"
-#include "logger.hpp"
 
 #include <cxxabi.h>
 #include <re2/re2.h>
@@ -8,6 +6,9 @@
 #include <stdexcept>
 #include <unordered_map>
 #include <unordered_set>
+
+#include "linespan.hpp"
+#include "logger.hpp"
 
 namespace xpto::blot {
 
@@ -56,7 +57,8 @@ std::string demangle_symbol(std::string_view mangled) {
 template <typename Output, typename Input, typename F>
 void sweeping(
     const Input& input, Output& output, const annotation_options& o, F fn,
-    std::vector<std::pair<std::string_view, std::string>>* demanglings = nullptr) {
+    std::vector<std::pair<std::string_view, std::string>>* demanglings =
+        nullptr) {
   size_t linum{1};
 
   std::array<match_t, 10> matches;
@@ -68,25 +70,26 @@ void sweeping(
 
     auto preserve = [&]() {
       linum++;
-      
+
       // Collect demangling information if requested
       if (o.demangle && demanglings) {
         std::string_view line = *it;
         re2::StringPiece input_piece(line.data(), line.size());
         re2::StringPiece match;
-        
+
         // Find all mangled symbols in this line
-        while (RE2::FindAndConsume(&input_piece, R"((_Z[A-Za-z0-9_]+))", &match)) {
+        while (
+            RE2::FindAndConsume(&input_piece, R"((_Z[A-Za-z0-9_]+))", &match)) {
           std::string_view mangled_sv(match.data(), match.size());
           std::string demangled = utils::demangle_symbol(mangled_sv);
-          
+
           // Only store if demangling actually changed the symbol
           if (demangled != mangled_sv) {
             demanglings->emplace_back(mangled_sv, std::move(demangled));
           }
         }
       }
-      
+
       output.emplace_back(*it);
       ++it;
       done = true;
@@ -138,21 +141,40 @@ const RE2 r_label_reference            {R"(\.[A-Z_a-z][$.0-9A-Z_a-z]*)"};
 const RE2 r_defines_global             {R"(^[[:space:]]*\.globa?l[[:space:]]*([.A-Z_a-z][$.0-9A-Z_a-z]*))"};
 const RE2 r_defines_function_or_object {R"(^[[:space:]]*\.type[[:space:]]*(.*),[[:space:]]*[%@])"};
 const RE2 r_main_file_name             {R"(^[[:space:]]*\.file[[:space:]]+\"([^\"]+)\"$)"};
-const RE2 r_source_file_hint           {R"(^[[:space:]]*\.file[[:space:]]+([[:digit:]]+)[[:space:]]+\"([^\"]+)\"(?:[[:space:]]+\"([^\"]+)\")?.*)"};
+const RE2 r_source_file_hint           {R"(^[[:space:]]*\.file[[:space:]]+([[:digit:]]+)(?:[[:space:]]+\"([^\"]+)\")?[[:space:]]+\"([^\"]+)\"(?:[[:space:]]+md5[[:space:]]+(0x[[:xdigit:]]+))?.*)"};
 const RE2 r_source_tag                 {R"(^[[:space:]]*\.loc[[:space:]]+([[:digit:]]+)[[:space:]]+([[:digit:]]+).*)"};
 const RE2 r_source_stab                {R"(^.*\.stabn[[:space:]]+([[:digit:]]+),0,([[:digit:]]+),.*)"};
 const RE2 r_endblock                   {R"(\.(?:cfi_endproc|data|section|text))"};
 const RE2 r_data_defn                  {R"(^[[:space:]]*\.(string|asciz|ascii|[1248]?byte|short|word|long|quad|value|zero))"};
 // clang-format on
 
+struct file_info {
+  std::string filename;
+  std::string directory;
+  std::string md5_checksum;
+
+  bool operator==(const file_info& other) const noexcept {
+    if (!md5_checksum.empty()) {
+      return md5_checksum == other.md5_checksum;
+    }
+    if (filename == other.filename) {
+      return true;
+    }
+    return false;  // TODO check with directory and basename
+  }
+};
+
 struct parser_state {
   std::unordered_map<label_t, std::vector<label_t>> routines;
   std::unordered_set<label_t> globals{};
   std::optional<label_t> current_global{};
-  std::optional<label_t> main_file_tag{};
+  std::optional<std::set<label_t>> main_file_tag{};
   std::optional<std::string> main_file_name{};
+  std::optional<size_t> main_file_no{};
   std::unordered_set<label_t> main_file_routines{};
   std::unordered_set<label_t> used_labels{};
+
+  std::unordered_map<size_t, file_info> file_table{};
 
   linemap_t linemap{};
 
@@ -186,7 +208,7 @@ struct parser_state {
 namespace utils {}  // namespace utils
 
 void intermediate(parser_state& s, const annotation_options& o) {
-  if (!s.main_file_tag)
+  if (!s.main_file_tag || s.main_file_tag->empty())
     throw std::runtime_error("Cannot proceed without a 'main_file_tag'");
   if (o.preserve_library_functions) {
     for (auto&& [label, callees] : s.routines) {
@@ -252,32 +274,36 @@ auto first_pass(
             s.globals.insert(matches[1]);
           } else if (match(r_source_file_hint)) {
             LOG_TRACE("FP2.4 '{}'", *it);
-            // Horrible heuristic accounts for four cases
-            //
-            // cat test/test01.cpp | clang++ --std=c++23 -S -g -x c++ - -o -
-            // cat test/test01.cpp | g++ --std=c++23 -S -g -x c++ - -o -
-            // clang++ --std=c++23 -S -g test/test01.cpp -o -
-            // gcc++ --std=c++23 -S -g test/test01.cpp -o -
-            //
-            // All of these produce slightly different '.file'
-            // directives, and the following code tries to guess
-            // accordingly.
-            if (!s.main_file_name && matches[3].size()) {
-              s.main_file_name = matches[3] == "-" ? "<stdin>" : matches[3];
-              s.main_file_tag = matches[1];
+            // Parse .file directive with DWARF-5 support
+            // Format: .file fileno [dirname] filename [md5 value]
+
+            auto fileno_opt = utils::to_size_t(matches[1]);
+            if (fileno_opt) {
+              auto fileno = *fileno_opt;
+
+              auto& info = s.file_table[fileno];
+              info.directory = matches[2];
+              info.filename = matches[3] == "-" ? "<stdin>" : matches[3];
+              info.md5_checksum = matches[4];
+
               LOG_DEBUG(
-                  "FP2.4.1 set main_file_name={} and main_file_tag={}",
-                  *s.main_file_name, *s.main_file_tag);
-            }
-            if (s.main_file_name && !matches[3].size() &&
-                *s.main_file_name == matches[2]) {
-              LOG_DEBUG("FP2.4.2 updated main_file_tag={}", *s.main_file_tag);
-              s.main_file_tag = matches[1];
+                  "FP2.4.file added file {} -> {} dir={} md5={}", fileno,
+                  info.filename, info.directory, info.md5_checksum);
+
+              if (!s.main_file_name) {
+                s.main_file_name = info.filename;
+                s.main_file_tag.emplace();
+                s.main_file_no = fileno;
+              }
+              // here main_file_name and main_file_no is set
+              if (s.file_table[*s.main_file_no] == info) {
+                s.main_file_tag->emplace(matches[1]);
+              }
             }
           } else if (match(r_source_tag)) {
             LOG_TRACE("FP2.5 '{}'", *it);
             if (s.current_global && s.main_file_tag &&
-                matches[1] == s.main_file_tag) {
+                s.main_file_tag->contains(matches[1])) {
               LOG_TRACE("FP2.5.1 '{}'", *it);
               s.main_file_routines.insert(*s.current_global);
             }
@@ -304,7 +330,7 @@ annotation_result second_pass(
 
   using output_t = std::vector<std::string_view>;
   output_t output;
-  
+
   std::vector<std::pair<std::string_view, std::string>> demanglings;
 
   sweeping(
@@ -343,7 +369,7 @@ annotation_result second_pass(
           } else if (match(r_source_tag)) {
             LOG_TRACE("SP2.3 '{}'", *it);
             source_linum = [&]() -> std::optional<int> {
-              if (*s.main_file_tag == matches[1]) {
+              if (s.main_file_tag->contains(matches[1])) {
                 return utils::to_size_t(matches[2]);
               } else {
                 return std::nullopt;
@@ -374,12 +400,12 @@ annotation_result second_pass(
             reachable_label = std::nullopt;
           }
         }
-      }, &demanglings);
+      },
+      &demanglings);
   return {output, s.linemap, demanglings};
 }
 
 }  // namespace detail
-
 
 annotation_result annotate(
     std::span<const char> input, const annotation_options& options) {
