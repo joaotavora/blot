@@ -135,6 +135,11 @@ struct parser_state {
 
   // Internal linemap using map/set for efficient merging
   std::map<linum_t, std::set<std::pair<linum_t, linum_t>>> internal_linemap{};
+  std::unordered_map<size_t, file_info> file_table{};
+
+  assembly_map_t assembly_map{};
+  std::optional<size_t> current_file_no{};
+  std::optional<size_t> current_source_line{};
 
   void register_mapping(linum_t source_linum, linum_t asm_linum) {
     auto [probe, inserted] =
@@ -171,6 +176,17 @@ struct parser_state {
       }
     }
     return result;
+  }
+
+  void register_assembly_mapping(linum_t asm_linum, size_t file_no, linum_t source_linum) {
+    auto file_it = file_table.find(file_no);
+    if (file_it != file_table.end()) {
+      const auto& info = file_it->second;
+      auto full_path = info.directory.empty() ?
+        std::string{info.filename} :
+        std::string{info.directory} + "/" + std::string{info.filename};
+      assembly_map[asm_linum] = {std::move(full_path), source_linum};
+    }
   }
 };
 
@@ -256,6 +272,7 @@ auto first_pass(
             } else if (*s.main_file == info) {
               s.main_file->tags.insert(fileno);
             }
+            s.file_table[fileno] = info;
           } else if (match(r_source_tag)) {
             LOG_TRACE("FP2.5 '{}'", *it);
             if (s.current_global && s.main_file &&
@@ -263,6 +280,9 @@ auto first_pass(
               LOG_TRACE("FP2.5.1 '{}'", *it);
               s.main_file_routines.insert(*s.current_global);
             }
+            // Parse file number and line number for assembly mapping
+            s.current_file_no = to_size_t(matches[1]);
+            s.current_source_line = to_size_t(matches[2]);
             LOG_TRACE("Preserve: FP2.5 '{}'", *it);
             preserve();
           } else if (match(r_endblock)) {
@@ -341,6 +361,10 @@ annotation_result second_pass(
               s.register_mapping(*source_linum, asm_linum());
               LOG_TRACE("SP2.2.1 '{}'", *it);
             }
+            // Register assembly mapping for this instruction
+            if (s.current_file_no && s.current_source_line) {
+              s.register_assembly_mapping(asm_linum(), *s.current_file_no, *s.current_source_line);
+            }
             LOG_TRACE("Preserve: SP2.2 '{}'", *it);
             preserve();
           } else if (match(r_source_tag)) {
@@ -353,6 +377,9 @@ annotation_result second_pass(
                 return std::nullopt;
               }
             }();
+            // Update current file and line tracking for assembly mapping
+            s.current_file_no = to_size_t(matches[1]);
+            s.current_source_line = to_size_t(matches[2]);
           } else if (match(r_source_stab)) {
             LOG_TRACE("SP2.4 '{}'", *it);
             // http://www.math.utah.edu/docs/info/stabs_11.html
@@ -377,7 +404,7 @@ annotation_result second_pass(
           }
         }
       });
-  return {output, s.get_linemap(), demanglings};
+  return {output, s.get_linemap(), s.assembly_map, demanglings};
 }
 
 std::vector<std::string> apply_demanglings(const annotation_result& result) {

@@ -124,8 +124,17 @@ json::object annotate_to_json(
     line_mappings.push_back(mapping);
   }
 
+  json::object assembly_mappings;
+  for (auto&& [asm_line, source_loc] : a_result.assembly_map) {
+    json::object mapping;
+    mapping["file"] = source_loc.filename;
+    mapping["line"] = source_loc.line;
+    assembly_mappings[std::to_string(asm_line)] = mapping;
+  }
+
   res["assembly"] = assembly_lines;
   res["line_mappings"] = line_mappings;
+  res["assembly_mappings"] = assembly_mappings;
 
   return res;
 }
