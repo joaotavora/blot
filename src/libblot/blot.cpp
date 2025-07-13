@@ -398,6 +398,47 @@ annotation_result second_pass(
 
 }  // namespace detail
 
+std::vector<std::string> apply_demanglings(const annotation_result& result) {
+  std::vector<std::string> output;
+  output.reserve(result.output.size());
+  
+  auto demangling_it = result.demanglings.begin();
+  
+  for (const auto& line : result.output) {
+    std::string demangled_line{line};
+    
+    // Apply all demanglings that intersect with this line
+    while (demangling_it != result.demanglings.end()) {
+      const auto& [mangled_sv, demangled] = *demangling_it;
+      
+      // Check if mangled_sv is within this line
+      if (mangled_sv.data() >= line.data() &&
+          mangled_sv.data() + mangled_sv.size() <= line.data() + line.size()) {
+        // Apply demangling to this line
+        const char* pos = line.data();
+        demangled_line.clear();
+        
+        // Append text before the mangled symbol
+        demangled_line.append(pos, mangled_sv.data());
+        // Append the demangled symbol
+        demangled_line.append(demangled);
+        // Append text after the mangled symbol
+        demangled_line.append(mangled_sv.data() + mangled_sv.size(),
+                             line.data() + line.size());
+        
+        ++demangling_it;
+      } else {
+        // This demangling doesn't apply to current line, stop checking
+        break;
+      }
+    }
+    
+    output.push_back(std::move(demangled_line));
+  }
+  
+  return output;
+}
+
 annotation_result annotate(
     std::span<const char> input, const annotation_options& options) {
   xpto::linespan lspan{input};

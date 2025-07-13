@@ -19,49 +19,6 @@ namespace fs = std::filesystem;
 namespace blot = xpto::blot;
 namespace json = boost::json;
 
-// Apply demanglings to a string_view, returning the result as a string
-std::string apply_demanglings(
-    std::string_view line,
-    const std::vector<std::pair<std::string_view, std::string>>& demanglings) {
-  // No demanglings for this line? Just return as string
-  bool has_demangling = false;
-  for (const auto& [mangled_sv, demangled] : demanglings) {
-    if (mangled_sv.data() >= line.data() &&
-        mangled_sv.data() + mangled_sv.size() <= line.data() + line.size()) {
-      has_demangling = true;
-      break;
-    }
-  }
-
-  if (!has_demangling) {
-    return std::string{line};
-  }
-
-  // Apply demanglings
-  std::string result;
-  const char* pos = line.data();
-  const char* end = line.data() + line.size();
-
-  for (const auto& [mangled_sv, demangled] : demanglings) {
-    // Check if this demangling applies to current line
-    if (mangled_sv.data() >= line.data() &&
-        mangled_sv.data() + mangled_sv.size() <= line.data() + line.size()) {
-      // Append text before the mangled symbol
-      result.append(pos, mangled_sv.data());
-
-      // Append the demangled symbol
-      result.append(demangled);
-
-      // Move position past the mangled symbol
-      pos = mangled_sv.data() + mangled_sv.size();
-    }
-  }
-
-  // Append remaining text
-  result.append(pos, end);
-
-  return result;
-}
 
 int main(int argc, char* argv[]) {  // NOLINT(*exception*)
   xpto::blot::file_options fopts;
@@ -130,14 +87,9 @@ int main(int argc, char* argv[]) {  // NOLINT(*exception*)
 
   if (json_output) {
     json::object json_result;
-    json::array assembly_lines;
 
-    for (auto&& line : result.output) {
-      std::string output_line =
-          aopts.demangle ? apply_demanglings(line, result.demanglings)
-                         : std::string{line};
-      assembly_lines.push_back(json::value(output_line));
-    }
+    auto output_lines = xpto::blot::apply_demanglings(result);
+    json::array assembly_lines(output_lines.begin(), output_lines.end());
 
     json::array line_mappings;
     for (auto&& [src_line, asm_start, asm_end] : result.linemap) {
@@ -153,12 +105,9 @@ int main(int argc, char* argv[]) {  // NOLINT(*exception*)
 
     std::cout << json::serialize(json_result) << "\n";
   } else {
-    for (auto&& line : result.output) {
-      if (aopts.demangle) {
-        std::cout << apply_demanglings(line, result.demanglings) << "\n";
-      } else {
-        std::cout << line << "\n";
-      }
+    auto output_lines = xpto::blot::apply_demanglings(result);
+    for (const auto& line : output_lines) {
+      std::cout << line << "\n";
     }
   }
 }

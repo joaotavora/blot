@@ -26,4 +26,7 @@ struct annotation_result {
 
 annotation_result annotate(
     std::span<const char> input, const annotation_options& options);
+
+std::vector<std::string> apply_demanglings(const annotation_result& result);
+
 }  // namespace xpto::blot

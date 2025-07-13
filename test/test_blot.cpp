@@ -81,11 +81,12 @@ struct TestFixture {
         std::istreambuf_iterator<char>());
     auto expected = json::parse(content).as_object();
 
-    // Compare assembly output
+    // Compare assembly output (apply demanglings)
+    auto output_lines = xpto::blot::apply_demanglings(result);
     auto& expected_assembly = expected["assembly"].as_array();
-    REQUIRE(result.output.size() == expected_assembly.size());
-    for (size_t i = 0; i < result.output.size(); ++i) {
-      CHECK(result.output[i] == expected_assembly[i].as_string());
+    REQUIRE(output_lines.size() == expected_assembly.size());
+    for (size_t i = 0; i < output_lines.size(); ++i) {
+      CHECK(output_lines[i] == expected_assembly[i].as_string());
     }
 
     // Compare line mappings (new array format)
