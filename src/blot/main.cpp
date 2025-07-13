@@ -1,19 +1,19 @@
-#include "blot/assembly.hpp"
-#include "blot/blot.hpp"
-#include "blot/ccj.hpp"
-#include "../libblot/logger.hpp"
-#include "options.hpp"
-
 #include <fmt/std.h>
 #include <re2/re2.h>
 #include <unistd.h>
-#include <boost/json.hpp>
-#include <CLI/CLI.hpp>
 
+#include <CLI/CLI.hpp>
+#include <boost/json.hpp>
 #include <fstream>
 #include <iostream>
 #include <optional>
 #include <span>
+
+#include "../libblot/logger.hpp"
+#include "blot/assembly.hpp"
+#include "blot/blot.hpp"
+#include "blot/ccj.hpp"
+#include "options.hpp"
 
 namespace fs = std::filesystem;
 namespace blot = xpto::blot;
@@ -21,47 +21,45 @@ namespace json = boost::json;
 
 // Apply demanglings to a string_view, returning the result as a string
 std::string apply_demanglings(
-    std::string_view line, 
+    std::string_view line,
     const std::vector<std::pair<std::string_view, std::string>>& demanglings) {
-  
   // No demanglings for this line? Just return as string
   bool has_demangling = false;
   for (const auto& [mangled_sv, demangled] : demanglings) {
-    if (mangled_sv.data() >= line.data() && 
+    if (mangled_sv.data() >= line.data() &&
         mangled_sv.data() + mangled_sv.size() <= line.data() + line.size()) {
       has_demangling = true;
       break;
     }
   }
-  
+
   if (!has_demangling) {
     return std::string{line};
   }
-  
+
   // Apply demanglings
   std::string result;
   const char* pos = line.data();
   const char* end = line.data() + line.size();
-  
+
   for (const auto& [mangled_sv, demangled] : demanglings) {
     // Check if this demangling applies to current line
-    if (mangled_sv.data() >= line.data() && 
+    if (mangled_sv.data() >= line.data() &&
         mangled_sv.data() + mangled_sv.size() <= line.data() + line.size()) {
-      
       // Append text before the mangled symbol
       result.append(pos, mangled_sv.data());
-      
+
       // Append the demangled symbol
       result.append(demangled);
-      
+
       // Move position past the mangled symbol
       pos = mangled_sv.data() + mangled_sv.size();
     }
   }
-  
+
   // Append remaining text
   result.append(pos, end);
-  
+
   return result;
 }
 
@@ -135,9 +133,9 @@ int main(int argc, char* argv[]) {  // NOLINT(*exception*)
     json::array assembly_lines;
 
     for (auto&& line : result.output) {
-      std::string output_line = aopts.demangle ? 
-        apply_demanglings(line, result.demanglings) : 
-        std::string{line};
+      std::string output_line =
+          aopts.demangle ? apply_demanglings(line, result.demanglings)
+                         : std::string{line};
       assembly_lines.push_back(json::value(output_line));
     }
 

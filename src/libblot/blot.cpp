@@ -1,15 +1,16 @@
 #include "blot/blot.hpp"
-#include "linespan.hpp"
-#include "logger.hpp"
 
 #include <cxxabi.h>
 #include <re2/re2.h>
 
+#include <map>
+#include <set>
 #include <stdexcept>
 #include <unordered_map>
 #include <unordered_set>
-#include <set>
-#include <map>
+
+#include "linespan.hpp"
+#include "logger.hpp"
 
 namespace xpto::blot {
 
@@ -58,7 +59,8 @@ std::string demangle_symbol(std::string_view mangled) {
 template <typename Output, typename Input, typename F>
 void sweeping(
     const Input& input, Output& output, const annotation_options& o, F fn,
-    std::vector<std::pair<std::string_view, std::string>>* demanglings = nullptr) {
+    std::vector<std::pair<std::string_view, std::string>>* demanglings =
+        nullptr) {
   size_t linum{1};
 
   std::array<match_t, 10> matches;
@@ -70,25 +72,26 @@ void sweeping(
 
     auto preserve = [&]() {
       linum++;
-      
+
       // Collect demangling information if requested
       if (o.demangle && demanglings) {
         std::string_view line = *it;
         re2::StringPiece input_piece(line.data(), line.size());
         re2::StringPiece match;
-        
+
         // Find all mangled symbols in this line
-        while (RE2::FindAndConsume(&input_piece, R"((_Z[A-Za-z0-9_]+))", &match)) {
+        while (
+            RE2::FindAndConsume(&input_piece, R"((_Z[A-Za-z0-9_]+))", &match)) {
           std::string_view mangled_sv(match.data(), match.size());
           std::string demangled = utils::demangle_symbol(mangled_sv);
-          
+
           // Only store if demangling actually changed the symbol
           if (demangled != mangled_sv) {
             demanglings->emplace_back(mangled_sv, std::move(demangled));
           }
         }
       }
-      
+
       output.emplace_back(*it);
       ++it;
       done = true;
@@ -184,7 +187,7 @@ struct parser_state {
       set.emplace(asm_linum, asm_linum);
     }
   }
-  
+
   // Convert internal linemap to public format
   linemap_t get_linemap() const {
     linemap_t result;
@@ -318,7 +321,7 @@ annotation_result second_pass(
 
   using output_t = std::vector<std::string_view>;
   output_t output;
-  
+
   std::vector<std::pair<std::string_view, std::string>> demanglings;
 
   sweeping(
@@ -388,12 +391,12 @@ annotation_result second_pass(
             reachable_label = std::nullopt;
           }
         }
-      }, &demanglings);
+      },
+      &demanglings);
   return {output, s.get_linemap(), demanglings};
 }
 
 }  // namespace detail
-
 
 annotation_result annotate(
     std::span<const char> input, const annotation_options& options) {

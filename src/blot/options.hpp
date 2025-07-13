@@ -1,9 +1,9 @@
 #pragma once
 
-#include "blot/blot.hpp"
-
 #include <filesystem>
 #include <span>
+
+#include "blot/blot.hpp"
 
 namespace fs = std::filesystem;
 
@@ -16,8 +16,6 @@ struct file_options {
 };
 
 std::optional<int> parse_options(
-    std::span<char*> args, int& loglevel,
-    xpto::blot::file_options& fopts,
-    xpto::blot::annotation_options& aopts,
-    bool& json_output);
-}
+    std::span<char*> args, int& loglevel, xpto::blot::file_options& fopts,
+    xpto::blot::annotation_options& aopts, bool& json_output);
+}  // namespace xpto::blot

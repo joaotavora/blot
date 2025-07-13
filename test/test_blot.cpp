@@ -1,14 +1,14 @@
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 #include <doctest/doctest.h>
+
 #include <boost/json.hpp>
 #include <filesystem>
 #include <fstream>
 #include <string>
 
+#include "blot/assembly.hpp"
 #include "blot/blot.hpp"
 #include "blot/ccj.hpp"
-#include "blot/assembly.hpp"
-
 #include "test_config.h"
 
 namespace fs = std::filesystem;
@@ -95,7 +95,7 @@ struct TestFixture {
     for (size_t i = 0; i < expected_mappings.size(); ++i) {
       auto& expected_mapping = expected_mappings[i].as_object();
       auto& [src_line, asm_start, asm_end] = result.linemap[i];
-      
+
       CHECK(src_line == expected_mapping["source_line"].as_int64());
       CHECK(asm_start == expected_mapping["asm_start"].as_int64());
       CHECK(asm_end == expected_mapping["asm_end"].as_int64());
@@ -107,27 +107,33 @@ struct TestFixture {
 TestFixture fixture;
 
 TEST_CASE("test00_annotation") {
-  fixture.test_annotation_against_expectation("test00.cpp", "test00.json", fixture.ccj_path);
+  fixture.test_annotation_against_expectation(
+      "test00.cpp", "test00.json", fixture.ccj_path);
 }
 
 TEST_CASE("test01_annotation") {
-  fixture.test_annotation_against_expectation("test01.cpp", "test01.json", fixture.ccj_path);
+  fixture.test_annotation_against_expectation(
+      "test01.cpp", "test01.json", fixture.ccj_path);
 }
 
 TEST_CASE("test02_annotation_demangling") {
-  fixture.test_annotation_against_expectation("test02.cpp", "test02.json", fixture.ccj_path, {.demangle = true});
+  fixture.test_annotation_against_expectation(
+      "test02.cpp", "test02.json", fixture.ccj_path, {.demangle = true});
 }
 
 TEST_CASE("test03_annotation_comments") {
-  fixture.test_annotation_against_expectation("test03.cpp", "test03.json", fixture.ccj_path, 
-    {.preserve_directives = true, .preserve_comments = true});
+  fixture.test_annotation_against_expectation(
+      "test03.cpp", "test03.json", fixture.ccj_path,
+      {.preserve_directives = true, .preserve_comments = true});
 }
 
 TEST_CASE("test04_annotation_library_functions") {
-  fixture.test_annotation_against_expectation("test04.cpp", "test04.json", fixture.ccj_path, 
-    {.preserve_library_functions = true});
+  fixture.test_annotation_against_expectation(
+      "test04.cpp", "test04.json", fixture.ccj_path,
+      {.preserve_library_functions = true});
 }
 
 TEST_CASE("test05_annotation_minimal") {
-  fixture.test_annotation_against_expectation("test05.cpp", "test05.json", fixture.ccj_path);
+  fixture.test_annotation_against_expectation(
+      "test05.cpp", "test05.json", fixture.ccj_path);
 }
