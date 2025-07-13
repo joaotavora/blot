@@ -1,38 +1,38 @@
 [
 {
   "directory": ".",
-  "command": "/usr/bin/c++ -std=c++23 -g -O2 -o test00.o -c test00.cpp",
-  "file": "test00.cpp",
-  "output": "test00.o"
+  "command": "/usr/bin/c++ -std=c++23 -g -O2 -o basic.o -c basic.cpp",
+  "file": "basic.cpp",
+  "output": "basic.o"
 },
 {
   "directory": ".",
-  "command": "/usr/bin/c++ -std=c++23 -g -O2 -o test01.o -c test01.cpp",
-  "file": "test01.cpp",
-  "output": "test01.o"
+  "command": "/usr/bin/c++ -std=c++23 -g -O2 -o still_pretty_basic.o -c still_pretty_basic.cpp",
+  "file": "still_pretty_basic.cpp",
+  "output": "still_pretty_basic.o"
 },
 {
   "directory": ".",
-  "command": "/usr/bin/c++ -std=c++23 -g -O2 -o test02.o -c test02.cpp",
-  "file": "test02.cpp",
-  "output": "test02.o"
+  "command": "/usr/bin/c++ -std=c++23 -g -O2 -o demangle.o -c demangle.cpp",
+  "file": "demangle.cpp",
+  "output": "demangle.o"
 },
 {
   "directory": ".",
-  "command": "/usr/bin/c++ -std=c++23 -g -O2 -o test03.o -c test03.cpp",
-  "file": "test03.cpp",
-  "output": "test03.o"
+  "command": "/usr/bin/c++ -std=c++23 -g -O2 -o preserve_directives.o -c preserve_directives.cpp",
+  "file": "preserve_directives.cpp",
+  "output": "preserve_directives.o"
 },
 {
   "directory": ".",
-  "command": "/usr/bin/c++ -std=c++23 -g -O0 -o test04.o -c test04.cpp",
-  "file": "test04.cpp",
-  "output": "test04.o"
+  "command": "/usr/bin/c++ -std=c++23 -g -O0 -o preserve_library_functions.o -c preserve_library_functions.cpp",
+  "file": "preserve_library_functions.cpp",
+  "output": "preserve_library_functions.o"
 },
 {
   "directory": ".",
-  "command": "/usr/bin/c++ -std=c++23 -g -O2 -o test05.o -c test05.cpp",
-  "file": "test05.cpp",
-  "output": "test05.o"
+  "command": "/usr/bin/c++ -std=c++23 -g -O2 -o minimal.o -c minimal.cpp",
+  "file": "minimal.cpp",
+  "output": "minimal.o"
 }
 ]
