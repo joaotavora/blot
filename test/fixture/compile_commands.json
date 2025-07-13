@@ -25,7 +25,7 @@
 },
 {
   "directory": ".",
-  "command": "/usr/bin/c++ -std=c++23 -g -O2 -o test04.o -c test04.cpp",
+  "command": "/usr/bin/c++ -std=c++23 -g -O0 -o test04.o -c test04.cpp",
   "file": "test04.cpp",
   "output": "test04.o"
 },
