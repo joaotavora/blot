@@ -1,7 +1,6 @@
 #pragma once
 
-#include <set>
-#include <map>
+#include <tuple>
 #include <vector>
 #include <string>
 #include <span>
@@ -17,7 +16,7 @@ struct annotation_options {
 };
 
 using linum_t = size_t;
-using linemap_t = std::map<linum_t, std::set<std::pair<linum_t, linum_t>>>;
+using linemap_t = std::vector<std::tuple<linum_t, linum_t, linum_t>>;
 
 struct annotation_result {
   std::vector<std::string_view> output;

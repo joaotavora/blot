@@ -8,6 +8,8 @@
 #include <stdexcept>
 #include <unordered_map>
 #include <unordered_set>
+#include <set>
+#include <map>
 
 namespace xpto::blot {
 
@@ -154,11 +156,12 @@ struct parser_state {
   std::unordered_set<label_t> main_file_routines{};
   std::unordered_set<label_t> used_labels{};
 
-  linemap_t linemap{};
+  // Internal linemap using map/set for efficient merging
+  std::map<linum_t, std::set<std::pair<linum_t, linum_t>>> internal_linemap{};
 
   void register_mapping(linum_t source_linum, linum_t asm_linum) {
     auto [probe, inserted] =
-        linemap.insert({source_linum, {{asm_linum, asm_linum}}});
+        internal_linemap.insert({source_linum, {{asm_linum, asm_linum}}});
     if (!inserted) {
       auto& set = probe->second;
       auto y = set.begin();
@@ -180,6 +183,17 @@ struct parser_state {
       }
       set.emplace(asm_linum, asm_linum);
     }
+  }
+  
+  // Convert internal linemap to public format
+  linemap_t get_linemap() const {
+    linemap_t result;
+    for (const auto& [src_line, ranges] : internal_linemap) {
+      for (const auto& [start, end] : ranges) {
+        result.emplace_back(src_line, start, end);
+      }
+    }
+    return result;
   }
 };
 
@@ -375,7 +389,7 @@ annotation_result second_pass(
           }
         }
       }, &demanglings);
-  return {output, s.linemap, demanglings};
+  return {output, s.get_linemap(), demanglings};
 }
 
 }  // namespace detail

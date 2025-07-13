@@ -69,22 +69,21 @@
     "\t.quad\t4981106967807881325",
     "\t.quad\t2410100292766691448"
   ],
-  "line_mappings": {
-    "4": [
-      {
-        "start": 2,
-        "end": 2
-      },
-      {
-        "start": 4,
-        "end": 5
-      }
-    ],
-    "8": [
-      {
-        "start": 34,
-        "end": 38
-      }
-    ]
-  }
+  "line_mappings": [
+    {
+      "source_line": 4,
+      "asm_start": 2,
+      "asm_end": 2
+    },
+    {
+      "source_line": 4,
+      "asm_start": 4,
+      "asm_end": 5
+    },
+    {
+      "source_line": 8,
+      "asm_start": 34,
+      "asm_end": 38
+    }
+  ]
 }

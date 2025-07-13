@@ -1,0 +1,21 @@
+{
+  "assembly": [
+    "_ZN4math16complex_functionEv:",
+    "\tret",
+    "main:",
+    "\tmovl\t$8, %eax",
+    "\tret"
+  ],
+  "line_mappings": [
+    {
+      "source_line": 17,
+      "asm_start": 2,
+      "asm_end": 2
+    },
+    {
+      "source_line": 26,
+      "asm_start": 4,
+      "asm_end": 5
+    }
+  ]
+}
