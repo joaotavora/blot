@@ -60,7 +60,7 @@ std::optional<int> parse_options(
       "Source file to annotate");
 
   try {
-    (app).parse(std::vector<std::string>(args.begin() + 1, args.end()));
+    (app).parse(static_cast<int>(args.size()), args.data());
   } catch (const CLI ::ParseError& e) {
     return (app).exit(e);
   };
