@@ -1,13 +1,13 @@
 {
   "assembly": [
-    "\t.file\t\"test03.cpp\"",
+    "\t.file\t\"preserve_directives.cpp\"",
     "\t.text",
-    "\t.file 0 \"/home/joao/Source/Cpp/blot/test/fixture\" \"test03.cpp\"",
+    "\t.file 0 \"/home/joao/Source/Cpp/blot/test/fixture\" \"preserve_directives.cpp\"",
     "\t.p2align 4",
     "\t.globl\t_Z12process_datav",
     "\t.type\t_Z12process_datav, @function",
     "_Z12process_datav:",
-    "\t.file 1 \"test03.cpp\"",
+    "\t.file 1 \"preserve_directives.cpp\"",
     "\t.loc 1 5 20",
     "\t.cfi_startproc",
     "\t.loc 1 15 1",
@@ -792,7 +792,7 @@
     "\t.string\t\"_ZNSt6vectorIiSaIiEED4Ev\"",
     "\t.section\t.debug_line_str,\"MS\",@progbits,1",
     "\t.string\t\"/home/joao/Source/Cpp/blot/test/fixture\"",
-    "\t.string\t\"test03.cpp\"",
+    "\t.string\t\"preserve_directives.cpp\"",
     "\t.ident\t\"GCC: (GNU) 15.1.1 20250425\"",
     "\t.section\t.note.GNU-stack,\"\",@progbits"
   ],

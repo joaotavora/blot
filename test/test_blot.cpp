@@ -107,40 +107,40 @@ struct TestFixture {
 // Global fixture instance
 TestFixture fixture;
 
-TEST_CASE("test00_annotation") {
+TEST_CASE("basic") {
   fixture.test_annotation_against_expectation(
-      "test00.cpp", "test00.json", fixture.ccj_path);
+      "basic.cpp", "basic.json", fixture.ccj_path);
 }
 
-TEST_CASE("test01_annotation") {
+TEST_CASE("still_pretty_basic") {
   fixture.test_annotation_against_expectation(
-      "test01.cpp", "test01.json", fixture.ccj_path);
+      "still_pretty_basic.cpp", "still_pretty_basic.json", fixture.ccj_path);
 }
 
-TEST_CASE("test02_annotation_demangling") {
+TEST_CASE("demangle") {
   fixture.test_annotation_against_expectation(
-      "test02.cpp", "test02.json", fixture.ccj_path, {.demangle = true});
+      "demangle.cpp", "demangle.json", fixture.ccj_path, {.demangle = true});
 }
 
-TEST_CASE("test03_annotation_comments") {
+TEST_CASE("preserve_directives") {
   fixture.test_annotation_against_expectation(
-      "test03.cpp", "test03.json", fixture.ccj_path,
+      "preserve_directives.cpp", "preserve_directives.json", fixture.ccj_path,
       {.preserve_directives = true, .preserve_comments = true});
 }
 
-TEST_CASE("test04_annotation_library_functions") {
+TEST_CASE("preserve_library_functions") {
   fixture.test_annotation_against_expectation(
-      "test04.cpp", "test04.json", fixture.ccj_path,
+      "preserve_library_functions.cpp", "preserve_library_functions.json", fixture.ccj_path,
       {.preserve_library_functions = true});
 }
 
-TEST_CASE("test04_annotation_no_library_functions") {
+TEST_CASE("no_preserve_library_functions") {
   fixture.test_annotation_against_expectation(
-      "test04.cpp", "test04_no_preserve.json", fixture.ccj_path,
+      "preserve_library_functions.cpp", "preserve_library_functions_off.json", fixture.ccj_path,
       {.preserve_library_functions = false});
 }
 
-TEST_CASE("test05_annotation_minimal") {
+TEST_CASE("minimal") {
   fixture.test_annotation_against_expectation(
-      "test05.cpp", "test05.json", fixture.ccj_path);
+      "minimal.cpp", "minimal.json", fixture.ccj_path);
 }
