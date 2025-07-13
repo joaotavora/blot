@@ -24,23 +24,13 @@
   ],
   "line_mappings": [
     {
-      "source_line": 5,
+      "source_line": 3,
       "asm_start": 2,
       "asm_end": 3
     },
     {
-      "source_line": 7,
+      "source_line": 5,
       "asm_start": 9,
-      "asm_end": 9
-    },
-    {
-      "source_line": 8,
-      "asm_start": 10,
-      "asm_end": 18
-    },
-    {
-      "source_line": 9,
-      "asm_start": 19,
       "asm_end": 21
     }
   ]

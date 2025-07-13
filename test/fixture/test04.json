@@ -1,14 +1,70 @@
 {
   "assembly": [
-    "main:",
+    "_ZL17internal_functionv:",
+    "\tpushq\t%rbp",
+    "\tmovq\t%rsp, %rbp",
     "\tmovl\t$100, %eax",
+    "\tpopq\t%rbp",
+    "\tret",
+    "main:",
+    "\tpushq\t%rbp",
+    "\tmovq\t%rsp, %rbp",
+    "\tsubq\t$16, %rsp",
+    "\tmovl\t$64, %edi",
+    "\tcall\tmalloc@PLT",
+    "\tmovq\t%rax, -8(%rbp)",
+    "\tmovq\t-8(%rbp), %rax",
+    "\tmovl\t$1953719668, (%rax)",
+    "\tmovb\t$0, 4(%rax)",
+    "\tcall\t_ZL17internal_functionv",
+    "\tmovl\t%eax, -12(%rbp)",
+    "\tmovq\t-8(%rbp), %rax",
+    "\tmovq\t%rax, %rdi",
+    "\tcall\tfree@PLT",
+    "\tmovl\t-12(%rbp), %eax",
+    "\tleave",
     "\tret"
   ],
   "line_mappings": [
     {
-      "source_line": 18,
+      "source_line": 5,
       "asm_start": 2,
-      "asm_end": 3
+      "asm_end": 6
+    },
+    {
+      "source_line": 7,
+      "asm_start": 8,
+      "asm_end": 10
+    },
+    {
+      "source_line": 9,
+      "asm_start": 11,
+      "asm_end": 13
+    },
+    {
+      "source_line": 10,
+      "asm_start": 14,
+      "asm_end": 16
+    },
+    {
+      "source_line": 12,
+      "asm_start": 17,
+      "asm_end": 18
+    },
+    {
+      "source_line": 14,
+      "asm_start": 19,
+      "asm_end": 21
+    },
+    {
+      "source_line": 15,
+      "asm_start": 22,
+      "asm_end": 22
+    },
+    {
+      "source_line": 16,
+      "asm_start": 23,
+      "asm_end": 24
     }
   ]
 }

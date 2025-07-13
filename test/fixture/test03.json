@@ -22,7 +22,7 @@
     "main:",
     "\t.loc 1 17 12",
     "\t.cfi_startproc",
-    "\t.loc 1 19 1",
+    "\t.loc 1 17 37",
     "\tmovl\t$15, %eax",
     "\tret",
     "\t.cfi_endproc",
@@ -803,7 +803,7 @@
       "asm_end": 13
     },
     {
-      "source_line": 19,
+      "source_line": 17,
       "asm_start": 24,
       "asm_end": 25
     }
