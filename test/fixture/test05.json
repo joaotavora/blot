@@ -1,0 +1,14 @@
+{
+  "assembly": [
+    "main:",
+    "\txorl\t%eax, %eax",
+    "\tret"
+  ],
+  "line_mappings": [
+    {
+      "source_line": 4,
+      "asm_start": 2,
+      "asm_end": 3
+    }
+  ]
+}

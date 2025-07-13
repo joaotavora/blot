@@ -142,14 +142,12 @@ int main(int argc, char* argv[]) {  // NOLINT(*exception*)
     }
 
     json::array line_mappings;
-    for (auto&& [src_line, asm_ranges] : result.linemap) {
-      for (auto&& [asm_start, asm_end] : asm_ranges) {
-        json::object mapping;
-        mapping["source_line"] = src_line;
-        mapping["asm_start"] = asm_start;
-        mapping["asm_end"] = asm_end;
-        line_mappings.push_back(mapping);
-      }
+    for (auto&& [src_line, asm_start, asm_end] : result.linemap) {
+      json::object mapping;
+      mapping["source_line"] = src_line;
+      mapping["asm_start"] = asm_start;
+      mapping["asm_end"] = asm_end;
+      line_mappings.push_back(mapping);
     }
 
     json_result["assembly"] = assembly_lines;

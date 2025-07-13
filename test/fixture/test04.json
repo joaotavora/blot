@@ -1,0 +1,14 @@
+{
+  "assembly": [
+    "main:",
+    "\tmovl\t$100, %eax",
+    "\tret"
+  ],
+  "line_mappings": [
+    {
+      "source_line": 18,
+      "asm_start": 2,
+      "asm_end": 3
+    }
+  ]
+}

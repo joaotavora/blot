@@ -22,31 +22,26 @@
     "\taddq\t$8, %rsp",
     "\tret"
   ],
-  "line_mappings": {
-    "5": [
-      {
-        "start": 2,
-        "end": 3
-      }
-    ],
-    "7": [
-      {
-        "start": 9,
-        "end": 9
-      }
-    ],
-    "8": [
-      {
-        "start": 10,
-        "end": 18
-      }
-    ],
-    "9": [
-      {
-        "start": 19,
-        "end": 21
-      }
-    ]
-  }
+  "line_mappings": [
+    {
+      "source_line": 5,
+      "asm_start": 2,
+      "asm_end": 3
+    },
+    {
+      "source_line": 7,
+      "asm_start": 9,
+      "asm_end": 9
+    },
+    {
+      "source_line": 8,
+      "asm_start": 10,
+      "asm_end": 18
+    },
+    {
+      "source_line": 9,
+      "asm_start": 19,
+      "asm_end": 21
+    }
+  ]
 }
-

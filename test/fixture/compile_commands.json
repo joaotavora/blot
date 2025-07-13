@@ -10,5 +10,29 @@
   "command": "/usr/bin/c++ -std=c++23 -g -O2 -o test01.o -c test01.cpp",
   "file": "test01.cpp",
   "output": "test01.o"
+},
+{
+  "directory": ".",
+  "command": "/usr/bin/c++ -std=c++23 -g -O2 -o test02.o -c test02.cpp",
+  "file": "test02.cpp",
+  "output": "test02.o"
+},
+{
+  "directory": ".",
+  "command": "/usr/bin/c++ -std=c++23 -g -O2 -o test03.o -c test03.cpp",
+  "file": "test03.cpp",
+  "output": "test03.o"
+},
+{
+  "directory": ".",
+  "command": "/usr/bin/c++ -std=c++23 -g -O2 -o test04.o -c test04.cpp",
+  "file": "test04.cpp",
+  "output": "test04.o"
+},
+{
+  "directory": ".",
+  "command": "/usr/bin/c++ -std=c++23 -g -O2 -o test05.o -c test05.cpp",
+  "file": "test05.cpp",
+  "output": "test05.o"
 }
 ]

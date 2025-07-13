@@ -88,23 +88,17 @@ struct TestFixture {
       BOOST_CHECK_EQUAL(result.output[i], expected_assembly[i].as_string());
     }
 
-    // Compare line mappings
-    auto& expected_mappings = expected["line_mappings"].as_object();
+    // Compare line mappings (new array format)
+    auto& expected_mappings = expected["line_mappings"].as_array();
     BOOST_REQUIRE_EQUAL(result.linemap.size(), expected_mappings.size());
 
-    for (auto& [src_line, asm_ranges] : result.linemap) {
-      std::string src_key = std::to_string(src_line);
-      BOOST_REQUIRE(expected_mappings.contains(src_key));
-
-      auto& expected_ranges = expected_mappings[src_key].as_array();
-      BOOST_REQUIRE_EQUAL(asm_ranges.size(), expected_ranges.size());
-
-      auto range_it = asm_ranges.begin();
-      for (size_t i = 0; i < expected_ranges.size(); ++i, ++range_it) {
-        auto& expected_range = expected_ranges[i].as_object();
-        BOOST_CHECK_EQUAL(range_it->first, expected_range["start"].as_int64());
-        BOOST_CHECK_EQUAL(range_it->second, expected_range["end"].as_int64());
-      }
+    for (size_t i = 0; i < expected_mappings.size(); ++i) {
+      auto& expected_mapping = expected_mappings[i].as_object();
+      auto& [src_line, asm_start, asm_end] = result.linemap[i];
+      
+      BOOST_CHECK_EQUAL(src_line, expected_mapping["source_line"].as_int64());
+      BOOST_CHECK_EQUAL(asm_start, expected_mapping["asm_start"].as_int64());
+      BOOST_CHECK_EQUAL(asm_end, expected_mapping["asm_end"].as_int64());
     }
   }
 };
@@ -117,6 +111,24 @@ BOOST_AUTO_TEST_CASE(test00_annotation) {
 
 BOOST_AUTO_TEST_CASE(test01_annotation) {
   test_annotation_against_expectation("test01.cpp", "test01.json", ccj_path);
+}
+
+BOOST_AUTO_TEST_CASE(test02_annotation_demangling) {
+  test_annotation_against_expectation("test02.cpp", "test02.json", ccj_path, {.demangle = true});
+}
+
+BOOST_AUTO_TEST_CASE(test03_annotation_comments) {
+  test_annotation_against_expectation("test03.cpp", "test03.json", ccj_path, 
+    {.preserve_directives = true, .preserve_comments = true});
+}
+
+BOOST_AUTO_TEST_CASE(test04_annotation_library_functions) {
+  test_annotation_against_expectation("test04.cpp", "test04.json", ccj_path, 
+    {.preserve_library_functions = true});
+}
+
+BOOST_AUTO_TEST_CASE(test05_annotation_minimal) {
+  test_annotation_against_expectation("test05.cpp", "test05.json", ccj_path);
 }
 
 BOOST_AUTO_TEST_SUITE_END()
