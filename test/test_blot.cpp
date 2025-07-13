@@ -134,6 +134,12 @@ TEST_CASE("test04_annotation_library_functions") {
       {.preserve_library_functions = true});
 }
 
+TEST_CASE("test04_annotation_no_library_functions") {
+  fixture.test_annotation_against_expectation(
+      "test04.cpp", "test04_no_preserve.json", fixture.ccj_path,
+      {.preserve_library_functions = false});
+}
+
 TEST_CASE("test05_annotation_minimal") {
   fixture.test_annotation_against_expectation(
       "test05.cpp", "test05.json", fixture.ccj_path);

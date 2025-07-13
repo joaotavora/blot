@@ -1,16 +1,6 @@
-// Test with library functions and external calls
-#include <cstdlib>
-#include <cstring>
+// Test with library functions that generate assembly code
+#include <vector>
 
-static int internal_function() { return 100; }
-
-int main() {
-  // Mix of library calls and local functions
-  char* buffer = (char*)malloc(64);
-  strcpy(buffer, "test");
-
-  int local_result = internal_function();
-
-  free(buffer);
-  return local_result;
+auto foo(const std::vector<int>& vec) {
+  return vec.size();
 }
