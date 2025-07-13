@@ -1,6 +1,6 @@
-#define BOOST_TEST_MODULE BlotTests
+#define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
+#include <doctest/doctest.h>
 #include <boost/json.hpp>
-#include <boost/test/unit_test.hpp>
 #include <filesystem>
 #include <fstream>
 #include <string>
@@ -40,7 +40,7 @@ struct TestFixture {
   // Load expected JSON file
   json::object load_expected(const std::string& test_name) {
     std::ifstream file(test_name + ".json");
-    BOOST_REQUIRE(file.is_open());
+    REQUIRE(file.is_open());
 
     std::string content(
         (std::istreambuf_iterator<char>(file)),
@@ -53,7 +53,7 @@ struct TestFixture {
   // Generate assembly for a test file using compile commands
   std::string generate_assembly(const std::string& test_file) {
     auto cmd = xpto::blot::find_compile_command(ccj_path, test_file);
-    BOOST_REQUIRE(cmd.has_value());
+    REQUIRE(cmd.has_value());
 
     return xpto::blot::get_asm(cmd->directory, cmd->command, cmd->file);
   }
@@ -66,7 +66,7 @@ struct TestFixture {
     // Generate assembly from compile commands
     auto cmd =
         xpto::blot::find_compile_command(compile_commands_file, cpp_file);
-    BOOST_REQUIRE(cmd.has_value());
+    REQUIRE(cmd.has_value());
     std::string assembly =
         xpto::blot::get_asm(cmd->directory, cmd->command, cmd->file);
 
@@ -75,7 +75,7 @@ struct TestFixture {
 
     // Load expected results
     std::ifstream file(expectation_file);
-    BOOST_REQUIRE(file.is_open());
+    REQUIRE(file.is_open());
     std::string content(
         (std::istreambuf_iterator<char>(file)),
         std::istreambuf_iterator<char>());
@@ -83,52 +83,51 @@ struct TestFixture {
 
     // Compare assembly output
     auto& expected_assembly = expected["assembly"].as_array();
-    BOOST_REQUIRE_EQUAL(result.output.size(), expected_assembly.size());
+    REQUIRE(result.output.size() == expected_assembly.size());
     for (size_t i = 0; i < result.output.size(); ++i) {
-      BOOST_CHECK_EQUAL(result.output[i], expected_assembly[i].as_string());
+      CHECK(result.output[i] == expected_assembly[i].as_string());
     }
 
     // Compare line mappings (new array format)
     auto& expected_mappings = expected["line_mappings"].as_array();
-    BOOST_REQUIRE_EQUAL(result.linemap.size(), expected_mappings.size());
+    REQUIRE(result.linemap.size() == expected_mappings.size());
 
     for (size_t i = 0; i < expected_mappings.size(); ++i) {
       auto& expected_mapping = expected_mappings[i].as_object();
       auto& [src_line, asm_start, asm_end] = result.linemap[i];
       
-      BOOST_CHECK_EQUAL(src_line, expected_mapping["source_line"].as_int64());
-      BOOST_CHECK_EQUAL(asm_start, expected_mapping["asm_start"].as_int64());
-      BOOST_CHECK_EQUAL(asm_end, expected_mapping["asm_end"].as_int64());
+      CHECK(src_line == expected_mapping["source_line"].as_int64());
+      CHECK(asm_start == expected_mapping["asm_start"].as_int64());
+      CHECK(asm_end == expected_mapping["asm_end"].as_int64());
     }
   }
 };
 
-BOOST_FIXTURE_TEST_SUITE(BlotTestSuite, TestFixture)
+// Global fixture instance
+TestFixture fixture;
 
-BOOST_AUTO_TEST_CASE(test00_annotation) {
-  test_annotation_against_expectation("test00.cpp", "test00.json", ccj_path);
+TEST_CASE("test00_annotation") {
+  fixture.test_annotation_against_expectation("test00.cpp", "test00.json", fixture.ccj_path);
 }
 
-BOOST_AUTO_TEST_CASE(test01_annotation) {
-  test_annotation_against_expectation("test01.cpp", "test01.json", ccj_path);
+TEST_CASE("test01_annotation") {
+  fixture.test_annotation_against_expectation("test01.cpp", "test01.json", fixture.ccj_path);
 }
 
-BOOST_AUTO_TEST_CASE(test02_annotation_demangling) {
-  test_annotation_against_expectation("test02.cpp", "test02.json", ccj_path, {.demangle = true});
+TEST_CASE("test02_annotation_demangling") {
+  fixture.test_annotation_against_expectation("test02.cpp", "test02.json", fixture.ccj_path, {.demangle = true});
 }
 
-BOOST_AUTO_TEST_CASE(test03_annotation_comments) {
-  test_annotation_against_expectation("test03.cpp", "test03.json", ccj_path, 
+TEST_CASE("test03_annotation_comments") {
+  fixture.test_annotation_against_expectation("test03.cpp", "test03.json", fixture.ccj_path, 
     {.preserve_directives = true, .preserve_comments = true});
 }
 
-BOOST_AUTO_TEST_CASE(test04_annotation_library_functions) {
-  test_annotation_against_expectation("test04.cpp", "test04.json", ccj_path, 
+TEST_CASE("test04_annotation_library_functions") {
+  fixture.test_annotation_against_expectation("test04.cpp", "test04.json", fixture.ccj_path, 
     {.preserve_library_functions = true});
 }
 
-BOOST_AUTO_TEST_CASE(test05_annotation_minimal) {
-  test_annotation_against_expectation("test05.cpp", "test05.json", ccj_path);
+TEST_CASE("test05_annotation_minimal") {
+  fixture.test_annotation_against_expectation("test05.cpp", "test05.json", fixture.ccj_path);
 }
-
-BOOST_AUTO_TEST_SUITE_END()

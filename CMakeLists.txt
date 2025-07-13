@@ -13,9 +13,10 @@ if(RE2_FOUND)
   )
 endif()
 
-find_package(Boost REQUIRED COMPONENTS process json unit_test_framework)
+find_package(Boost REQUIRED COMPONENTS process json)
 find_package(Fmt REQUIRED)
 find_package(CLI11 REQUIRED)
+find_package(doctest REQUIRED)
 
 # Core blot library
 file(GLOB lib_sources CONFIGURE_DEPENDS src/libblot/*.cpp)
@@ -52,13 +53,16 @@ add_library(fixture ${fixture_sources})
 # Generate test configuration header
 configure_file(test/test_config.h.in test/test_config.h)
 
-# Boost.Test runner
+# Doctest runner
 add_executable(test_blot test/test_blot.cpp)
 target_include_directories(test_blot PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/test)
 target_link_libraries(test_blot PRIVATE
   blot_lib
-  Boost::unit_test_framework
+  doctest::doctest
 )
 
 enable_testing()
-add_test(NAME blot_tests COMMAND test_blot)
+
+# Use doctest's test discovery to register individual test cases
+include(doctest)
+doctest_discover_tests(test_blot)

@@ -105,8 +105,11 @@ The architecture enforces clean separation between public interface and implemen
 
 #### Running Tests
 ```bash
-# Run tests without colored output (prevents terminal formatting issues)
-build-Debug/test_blot --no_color_output
+# Run all tests (doctest automatically provides clean output)
+build-Debug/test_blot
+
+# Run with CTest for individual test case reporting
+ctest --verbose
 
 # Regenerate test expectations from project root
 build-Debug/blot --compile_commands test/fixture/compile_commands.json test/fixture/test02.cpp --json | jq > test/fixture/test02.json
