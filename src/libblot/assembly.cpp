@@ -5,8 +5,8 @@
 #include <boost/asio/read.hpp>
 #include <boost/asio/readable_pipe.hpp>
 #include <boost/process/v2/process.hpp>
-#include <boost/process/v2/stdio.hpp>
 #include <boost/process/v2/start_dir.hpp>
+#include <boost/process/v2/stdio.hpp>
 #include <boost/system/detail/error_code.hpp>
 #include <filesystem>
 #include <string>
@@ -38,7 +38,7 @@ std::string get_asm(
     if (arg.substr(0, 2) == "-o") {
       iss >> arg;
       continue;
-    } else if (arg.substr(0,2) == "-c") {
+    } else if (arg.substr(0, 2) == "-c") {
       arg = "-S";
       had_dash_c = true;
     }
@@ -57,27 +57,34 @@ std::string get_asm(
   args.push_back("-o");
   args.push_back("-");
 
-  LOG_INFO("Running compiler {}:\n{}", compiler,
-    [&](){
-        std::string res{compiler};
-        res.reserve(command.length());
-        for (const auto& a : args) {res+= " "; res += a;}
-        return res;
-    }());
+  LOG_INFO("Running compiler {}:\n{}", compiler, [&]() {
+    std::string res{compiler};
+    res.reserve(command.length());
+    for (const auto& a : args) {
+      res += " ";
+      res += a;
+    }
+    return res;
+  }());
 
   // process(asio::any_io_executor, filesystem::path, range<string> args,
   // AdditionalInitializers...)
   asio::io_context ctx;
   asio::readable_pipe rp{ctx};
   std::string output{};
-  boost::filesystem::path work_dir(directory.string()); // Convert to boost::filesystem::path
-  LOG_INFO("Running compiler {}:\nargs: {}\nworkdir: {}", compiler,
-    [&](){
+  boost::filesystem::path work_dir(
+      directory.string());  // Convert to boost::filesystem::path
+  LOG_INFO(
+      "Running compiler {}:\nargs: {}\nworkdir: {}", compiler,
+      [&]() {
         std::string res{compiler};
         res.reserve(command.length());
-        for (const auto& a : args) {res+= " "; res += a;}
+        for (const auto& a : args) {
+          res += " ";
+          res += a;
+        }
         return res;
-    }(),
+      }(),
       work_dir.c_str());
   p2::process proc{
     ctx, compiler, args,
@@ -89,6 +96,5 @@ std::string get_asm(
   proc.wait();
   return output;
 }
-
 
 }  // namespace xpto::blot

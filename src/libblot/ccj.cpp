@@ -1,13 +1,13 @@
 #include "blot/ccj.hpp"
 
+#include <fmt/std.h>
+
 #include <boost/filesystem.hpp>
 #include <boost/json.hpp>
 #include <boost/system/system_error.hpp>
-#include <fmt/std.h>
 #include <filesystem>
 #include <fstream>
 #include <optional>
-
 
 #include "logger.hpp"
 
@@ -30,8 +30,7 @@ std::optional<compile_command> find_compile_command(
     std::ifstream blob(compile_commands_path.string());
     if (!blob) {
       throw std::runtime_error(fmt::format(
-          "Could not open compile_commands.json at {}",
-          compile_commands_path));
+          "Could not open compile_commands.json at {}", compile_commands_path));
     }
 
     std::string content(
@@ -64,9 +63,8 @@ std::optional<compile_command> find_compile_command(
       fs::path ccj_entry_file = get("file");
 
       fs::path for_comp = ccj_entry_file.is_absolute()
-        ?
-        fs::absolute(target_path):
-        fs::relative(target_path, ccj_dir);
+                              ? fs::absolute(target_path)
+                              : fs::relative(target_path, ccj_dir);
 
       if (ccj_entry_file == for_comp)
         return compile_command{
@@ -78,8 +76,8 @@ std::optional<compile_command> find_compile_command(
       LOG_INFO("Having trouble because {}", e.what());
     }
   }
-  LOG_ERROR("No compilation command found for {} in {}",
-      target_path,
+  LOG_ERROR(
+      "No compilation command found for {} in {}", target_path,
       compile_commands_path);
   return std::nullopt;
 }

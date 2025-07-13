@@ -20,13 +20,12 @@ struct linespan {
     using reference = const value_type&;
 
     iterator(const char* start, const char* end)
-    : end_{end}, cur_line_{update(start)} {}
+        : end_{end}, cur_line_{update(start)} {}
 
     friend bool operator==(const iterator& a, const iterator& b) {
       // Can't use default because it compares cur_line_ by value.
-      return
-        a.cur_line_.begin() == b.cur_line_.begin() &&
-        a.cur_line_.end() == b.cur_line_.end();
+      return a.cur_line_.begin() == b.cur_line_.begin() &&
+             a.cur_line_.end() == b.cur_line_.end();
     }
 
     friend bool operator!=(const iterator& a, const iterator& b) {
@@ -63,7 +62,7 @@ struct linespan {
       return tmp;
     }
 
-  private:
+   private:
     std::string_view update(const char* start) {
       return std::string_view{start, std::find(start, end_, '\n')};
     }
@@ -73,22 +72,22 @@ struct linespan {
     std::string_view cur_line_;
   };
 
-// Constructor taking a span of chars
-explicit linespan(std::span<const char> data) : data_(data) {}
+  // Constructor taking a span of chars
+  explicit linespan(std::span<const char> data) : data_(data) {}
 
-// Begin and end methods
-iterator begin() const {
-  return iterator(data_.data(), data_.data() + data_.size());
-}
+  // Begin and end methods
+  iterator begin() const {
+    return iterator(data_.data(), data_.data() + data_.size());
+  }
 
-iterator end() const {
-  const char* end_ptr = data_.data() + data_.size();
-  return iterator(end_ptr, end_ptr);
-}
+  iterator end() const {
+    const char* end_ptr = data_.data() + data_.size();
+    return iterator(end_ptr, end_ptr);
+  }
 
-auto data(this auto&& self) { return self->data_; }
+  auto data(this auto&& self) { return self->data_; }
 
-private:
+ private:
   std::span<const char> data_;
 };
 }  // namespace xpto

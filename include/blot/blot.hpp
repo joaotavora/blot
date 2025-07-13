@@ -1,9 +1,9 @@
 #pragma once
 
+#include <span>
+#include <string>
 #include <tuple>
 #include <vector>
-#include <string>
-#include <span>
 
 namespace xpto::blot {
 
