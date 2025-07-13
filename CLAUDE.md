@@ -103,6 +103,15 @@ The architecture enforces clean separation between public interface and implemen
 - Tests use real compile commands and call core functions directly
 - **Next step**: Integrate with Compiler Explorer API (godbolt.org/api) for automated fixture generation and validation
 
+#### Running Tests
+```bash
+# Run tests without colored output (prevents terminal formatting issues)
+build-Debug/test_blot --no_color_output
+
+# Regenerate test expectations from project root
+build-Debug/blot --compile_commands test/fixture/compile_commands.json test/fixture/test02.cpp --json | jq > test/fixture/test02.json
+```
+
 ### JSON Output Structure
 ```json
 {
