@@ -70,7 +70,7 @@ annotated, cleaned assembly with source-to-assembly line mappings.
    options
 4. **Second Pass**: Generate clean output with line mappings
 
-### Dependencies
+### Runtime dependencies
 
 - **RE2**: Regular expression engine for assembly parsing
 - **Boost**: Process execution, JSON parsing, headers
@@ -79,7 +79,9 @@ annotated, cleaned assembly with source-to-assembly line mappings.
 
 ### Testing
 
-The project includes test files in `test/` directory that are compiled into a fixture library for reference in `compile_commands.json`.
+The project includes test files in `test/` directory that are compiled
+into a fixture library for reference in `compile_commands.json`.  The
+**doctest** package is used for the testing framework.
 
 ### Build Configuration
 
@@ -90,18 +92,34 @@ The project includes test files in `test/` directory that are compiled into a fi
 ## Development Practices & Future Work
 
 ### Code Organization
-- **`include/blot/`**: Public API headers only (blot.hpp, assembly.hpp, ccj.hpp)
-- **`src/libblot/`**: Core implementation (blot.cpp, assembly.cpp, ccj.cpp) and internal utilities (logger.hpp, linespan.hpp)
-- **`src/blot/`**: Application-specific code (main.cpp, options.{hpp,cpp})
+
+- **`include/blot/`**: Public API headers only (blot.hpp,
+  assembly.hpp, ccj.hpp)
+
+- **`src/libblot/`**: Core implementation (blot.cpp, assembly.cpp,
+  ccj.cpp) and internal utilities (logger.hpp, linespan.hpp)
+
+- **`src/blot/`**: Application-specific code (main.cpp,
+  options.{hpp,cpp})
+
 - **`test/fixture/`**: Test files with dedicated compile_commands.json
 
-The architecture enforces clean separation between public interface and implementation details. Users of the library only need to include headers from `include/blot/`, while all internal utilities and implementation are encapsulated in `src/libblot/`.
+The architecture enforces clean separation between public interface
+and implementation details. Users of the library only need to include
+headers from `include/blot/`, while all internal utilities and
+implementation are encapsulated in `src/libblot/`.
 
 ### Testing Strategy
-- Automated tests compare `xpto::blot::annotate()` output against expected JSON
+- Automated tests compare `xpto::blot::annotate()` output against
+  expected JSON
+
 - Generate expectations with `blot --json | jq` for human readability
+
 - Tests use real compile commands and call core functions directly
-- **Next step**: Integrate with Compiler Explorer API (godbolt.org/api) for automated fixture generation and validation
+
+- **Next step**: Integrate with Compiler Explorer API
+  (godbolt.org/api) for automated fixture generation and validation
+
 
 #### Running Tests
 ```bash
@@ -116,30 +134,10 @@ build-Debug/blot --compile_commands test/fixture/compile_commands.json test/fixt
 ```
 
 ### JSON Output Structure
-```json
-{
-  "assembly": ["instruction1", "instruction2", ...],
-  "line_mappings": {
-    "source_line": [{"start": asm_line, "end": asm_line}, ...]
-  }
-}
-```
 
-Note: Single source lines can map to multiple assembly ranges.
-
-### Commit Style
-- Use GNU ChangeLog format with concise file-level entries
-- Structure: headline + brief explanation (1-2 sentences max) + file breakdown
-- File-by-file patterns:
-  - `* path/file.ext: New file.`
-  - `* file.cpp: Include header.h.`  
-  - `* file.cpp (function_name): Rework.`
-  - `* CMakeLists.txt (target): Add/Remove/Update setting.`
-- Keep descriptions minimal - focus on WHAT changed, not HOW
-- "Rework" is the default for substantial changes, "Tweak" for minor changes
-- Be more specific when it adds clarity ("Add error handling", "Fix path resolution")
-- Key: stay concise while being appropriately descriptive
-- NO "Co-Authored-By" footers
+While the project is still young and in flux, this may change.  So
+just look at one of the fixture files like
+`test/fixture/preserve_directives.json`
 
 ### Major Future Challenges
 

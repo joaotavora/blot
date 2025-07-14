@@ -51,21 +51,11 @@ Add `--json` for structured output with line mappings.
 
 This should produce assembly output similar to Compiler Explorer:
 
-## Development Status
-
-### Completed Features
-- ✅ **Basic assembly annotation** with source-to-assembly line mappings
-- ✅ **JSON output format** for programmatic access (`--json` flag)
-- ✅ **Automated testing framework** with Boost.Test integration
-- ✅ **Library architecture** - separation between `libblot` (core) and 
-  `blot` (CLI)
-- ✅ **Three input modes** - source files, assembly files, piped input
-
 ### Roadmap
 
 #### Phase 1: Core Functionality
 1. **Expand test coverage** - achieve parity with Compiler Explorer filtering
-2. **Auto-demangling support** - integrate with `c++filt` or similar tools
+2. **Auto-demangling support** - demangle symbols using `cxxabi.h` (mostly done)
 3. **Compilation error handling** - decide where and how to display errors
 
 #### Phase 2: Header File Support
@@ -74,7 +64,7 @@ This should produce assembly output similar to Compiler Explorer:
 5. **Inclusion graph walking** - analyze #include dependencies to find 
    suitable compilation targets
 
-#### Phase 3: Live Editing Support  
+#### Phase 3: Live Editing Support
 6. **Virtual file system** - trick compilers into seeing in-memory file 
    representations as filesystem files
 7. **Unsaved buffer support** - enable live assembly updates without saving 
