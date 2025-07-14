@@ -1,13 +1,13 @@
 {
   "assembly": [
-    "\t.file\t\"preserve_directives.cpp\"",
+    "\t.file\t\"fxt_gcc_preserve_directives.cpp\"",
     "\t.text",
-    "\t.file 0 \"/home/joao/Source/Cpp/blot/test/fixture\" \"preserve_directives.cpp\"",
+    "\t.file 0 \"/home/joao/Source/Cpp/blot/test/fixture\" \"fxt_gcc_preserve_directives.cpp\"",
     "\t.p2align 4",
     "\t.globl\t_Z12process_datav",
     "\t.type\t_Z12process_datav, @function",
     "_Z12process_datav:",
-    "\t.file 1 \"preserve_directives.cpp\"",
+    "\t.file 1 \"fxt_gcc_preserve_directives.cpp\"",
     "\t.loc 1 5 20",
     "\t.cfi_startproc",
     "\t.loc 1 15 1",
@@ -791,8 +791,8 @@
     "\t.string\t\"_ZSt8_DestroyIPiiEvT_S1_RSaIT0_E\"",
     "\t.string\t\"_ZNSt6vectorIiSaIiEED4Ev\"",
     "\t.section\t.debug_line_str,\"MS\",@progbits,1",
+    "\t.string\t\"fxt_gcc_preserve_directives.cpp\"",
     "\t.string\t\"/home/joao/Source/Cpp/blot/test/fixture\"",
-    "\t.string\t\"preserve_directives.cpp\"",
     "\t.ident\t\"GCC: (GNU) 15.1.1 20250425\"",
     "\t.section\t.note.GNU-stack,\"\",@progbits"
   ],

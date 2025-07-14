@@ -1,38 +1,44 @@
 [
 {
   "directory": ".",
-  "command": "/usr/bin/c++ -std=c++23 -g -O2 -o basic.o -c basic.cpp",
-  "file": "basic.cpp",
-  "output": "basic.o"
+  "command": "/usr/bin/c++ -std=c++23 -g -O2 -o fxt_gcc_basic.o -c fxt_gcc_basic.cpp",
+  "file": "fxt_gcc_basic.cpp",
+  "output": "fxt_gcc_basic.o"
 },
 {
   "directory": ".",
-  "command": "/usr/bin/c++ -std=c++23 -g -O2 -o still_pretty_basic.o -c still_pretty_basic.cpp",
-  "file": "still_pretty_basic.cpp",
-  "output": "still_pretty_basic.o"
+  "command": "/usr/bin/c++ -std=c++23 -g -O2 -o fxt_gcc_still_pretty_basic.o -c fxt_gcc_still_pretty_basic.cpp",
+  "file": "fxt_gcc_still_pretty_basic.cpp",
+  "output": "fxt_gcc_still_pretty_basic.o"
 },
 {
   "directory": ".",
-  "command": "/usr/bin/c++ -std=c++23 -g -O2 -o demangle.o -c demangle.cpp",
-  "file": "demangle.cpp",
-  "output": "demangle.o"
+  "command": "/usr/bin/c++ -std=c++23 -g -O2 -o fxt_gcc_demangle.o -c fxt_gcc_demangle.cpp",
+  "file": "fxt_gcc_demangle.cpp",
+  "output": "fxt_gcc_demangle.o"
 },
 {
   "directory": ".",
-  "command": "/usr/bin/c++ -std=c++23 -g -O2 -o preserve_directives.o -c preserve_directives.cpp",
-  "file": "preserve_directives.cpp",
-  "output": "preserve_directives.o"
+  "command": "/usr/bin/c++ -std=c++23 -g -O2 -o fxt_gcc_preserve_directives.o -c fxt_gcc_preserve_directives.cpp",
+  "file": "fxt_gcc_preserve_directives.cpp",
+  "output": "fxt_gcc_preserve_directives.o"
 },
 {
   "directory": ".",
-  "command": "/usr/bin/c++ -std=c++23 -g -O0 -o preserve_library_functions.o -c preserve_library_functions.cpp",
-  "file": "preserve_library_functions.cpp",
-  "output": "preserve_library_functions.o"
+  "command": "/usr/bin/c++ -std=c++23 -g -O0 -o fxt_gcc_preserve_library_functions.o -c fxt_gcc_preserve_library_functions.cpp",
+  "file": "fxt_gcc_preserve_library_functions.cpp",
+  "output": "fxt_gcc_preserve_library_functions.o"
 },
 {
   "directory": ".",
-  "command": "/usr/bin/c++ -std=c++23 -g -O2 -o minimal.o -c minimal.cpp",
-  "file": "minimal.cpp",
-  "output": "minimal.o"
+  "command": "/usr/bin/c++ -std=c++23 -g -O2 -o fxt_gcc_minimal.o -c fxt_gcc_minimal.cpp",
+  "file": "fxt_gcc_minimal.cpp",
+  "output": "fxt_gcc_minimal.o"
+},
+{
+  "directory": ".",
+  "command": "/usr/bin/clang++ -std=c++23 -g -O0 -o fxt_clang_preserve_library_functions.o -c fxt_clang_preserve_library_functions.cpp",
+  "file": "fxt_clang_preserve_library_functions.cpp",
+  "output": "fxt_clang_preserve_library_functions.o"
 }
 ]

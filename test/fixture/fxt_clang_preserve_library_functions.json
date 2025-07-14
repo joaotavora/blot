@@ -1,0 +1,42 @@
+{
+  "assembly": [
+    "_Z3fooRKSt6vectorIiSaIiEE:              # @_Z3fooRKSt6vectorIiSaIiEE",
+    "\tpushq\t%rbp",
+    "\tmovq\t%rsp, %rbp",
+    "\tsubq\t$16, %rsp",
+    "\tmovq\t%rdi, -8(%rbp)",
+    "\tmovq\t-8(%rbp), %rdi",
+    "\tcallq\t_ZNKSt6vectorIiSaIiEE4sizeEv",
+    "\taddq\t$16, %rsp",
+    "\tpopq\t%rbp",
+    "\tretq",
+    "_ZNKSt6vectorIiSaIiEE4sizeEv:           # @_ZNKSt6vectorIiSaIiEE4sizeEv",
+    "\tpushq\t%rbp",
+    "\tmovq\t%rsp, %rbp",
+    "\tmovq\t%rdi, -8(%rbp)",
+    "\tmovq\t-8(%rbp), %rcx",
+    "\tmovq\t8(%rcx), %rax",
+    "\tmovq\t(%rcx), %rcx",
+    "\tsubq\t%rcx, %rax",
+    "\tsarq\t$2, %rax",
+    "\tmovq\t%rax, -16(%rbp)",
+    "\tcmpq\t$0, -16(%rbp)",
+    "\tjge\t.LBB1_2",
+    ".LBB1_2:",
+    "\tmovq\t-16(%rbp), %rax",
+    "\tpopq\t%rbp",
+    "\tretq"
+  ],
+  "line_mappings": [
+    {
+      "source_line": 4,
+      "asm_start": 2,
+      "asm_end": 5
+    },
+    {
+      "source_line": 5,
+      "asm_start": 6,
+      "asm_end": 10
+    }
+  ]
+}
