@@ -35,6 +35,8 @@ int main(int argc, char* argv[]) {  // NOLINT(*exception*)
       parse_options(std::span(argv, argc), loglevel, fopts, aopts, json_output);
   if (done) return done.value();
 
+  xpto::logger::set_level(static_cast<xpto::logger::level>(loglevel));
+
   LOG_INFO("loglevel={}", loglevel);
 
   LOG_DEBUG(
@@ -45,8 +47,6 @@ int main(int argc, char* argv[]) {  // NOLINT(*exception*)
   LOG_DEBUG(
       "asm_file_name={}\nsrc_file_name={}\ncompile_commands_path={}",
       fopts.asm_file_name, fopts.src_file_name, fopts.compile_commands_path);
-
-  xpto::logger::set_level(static_cast<xpto::logger::level>(loglevel));
 
   std::string input{};
 
