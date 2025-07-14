@@ -23,52 +23,62 @@ cmake -B $BUILD_DIR -DCMAKE_BUILD_TYPE=$BUILD_TYPE
 cmake --build $BUILD_DIR -j
 ```
 
-Blot can process assembly from three sources:
+Blot can annotate from 2 sources:
 
-1. **Source files** (requires entry in `compile_commands.json`): 
+1. C++ Source files
+
+   This requires an entry for the file in `compile_commands.json`.
+   Currently only C/C++ translation units are supported, header files
+   are not!
+  
    ```bash
-   cd test/fixture && ../../build-Debug/blot test01.cpp
+   build-Debug/blot --ccj test/fixture/compile_commands.json test/fixture/fxt_basic.cpp
    ```
    
    This uses your project's actual build configuration to compile the
    source file and generate assembly.
 
-2. **Assembly files**: 
+2. Some assembly code you might have generated with `gcc` or `clang`
+
+   Either pass it a file containing this assembly:
+
    ```bash
    echo 'int main() { return 42; }' | g++ -S -g -x c++ - -o file.s
    build-Debug/blot --asm-file=file.s
    ```
    
-   Read assembly directly from a pre-generated file.
+   Or pipe it into `blot`'s stdin:
 
-3. **Piped input**: 
    ```bash
    echo 'int main() { return 42; }' | g++ -S -g -x c++ - -o - | build-Debug/blot
    ```
-   Process assembly streamed from standard input.
 
 Add `--json` for structured output with line mappings.
-
-This should produce assembly output similar to Compiler Explorer:
+Add `--demangle` for demangled output.
 
 ### Roadmap
 
 #### Phase 1: Core Functionality
-1. **Expand test coverage** - achieve parity with Compiler Explorer filtering
-2. **Auto-demangling support** - demangle symbols using `cxxabi.h` (mostly done)
-3. **Compilation error handling** - decide where and how to display errors
+1. Expand test coverage.  Achieve parity with Compiler Explorer filtering.
+2. Auto-demangling support.  Demangle symbols using `cxxabi.h` (mostly done)
+3. Compilation error handling.  Decide where and how to display errors
 
 #### Phase 2: Header File Support
-4. **Header file annotation** - heuristically find "includer" translation 
+4. Header file annotation.  Heuristically find "includer" translation
    units that instantiate templates from header files
-5. **Inclusion graph walking** - analyze #include dependencies to find 
+5. Inclusion graph walking.  Analyze #include dependencies to find
    suitable compilation targets
 
 #### Phase 3: Live Editing Support
-6. **Virtual file system** - trick compilers into seeing in-memory file 
+6. Virtual file system.  Trick compilers into seeing in-memory file 
    representations as filesystem files
-7. **Unsaved buffer support** - enable live assembly updates without saving 
-   files (critical for editor integration)
+7. Unsaved buffer support.  Enable live assembly updates without
+   saving files (critical for editor integration)
+   
+#### Phase 4: Other niceties
+8. Decent-ish C/C++ stable API and ABI.  The so-called
+   "hourglass" pattern might come handy
+9. CI system
 
 The last challenge is particularly complex as no known compiler supports 
 compiling filesystem-based translation units while substituting specific 
