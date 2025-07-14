@@ -21,6 +21,11 @@ using matches_t = std::span<match_t>;
 using label_t = std::string_view;
 
 namespace utils {
+template<typename Exception, typename... Args>
+[[noreturn]] void throwf(fmt::format_string<Args...> format_str, Args&&... args) {
+    throw Exception(fmt::format(format_str, std::forward<Args>(args)...));
+}
+
 template <typename Dest, typename T, size_t N, std::size_t... Is>
 constexpr auto make_pointer_array_impl(
     std::array<T, N>& values, std::index_sequence<Is...>) {
@@ -32,13 +37,12 @@ constexpr auto make_pointer_array(std::array<T, N>& values) {
   return make_pointer_array_impl<Dest>(values, std::make_index_sequence<N>{});
 }
 
-std::optional<size_t> to_size_t(std::string_view sv) {
+size_t to_size_t(std::string_view sv) { // "or lose" semantics
   size_t result{};
   auto [ptr, ec] = std::from_chars(sv.begin(), sv.end(), result);
   if (ec == std::errc{} && ptr == sv.end())
     return result;
-  else
-    return std::nullopt;
+  utils::throwf<std::runtime_error>("'{}' isn't a number!", sv);
 }
 
 // Demangle C++ symbols using __cxa_demangle
@@ -142,8 +146,7 @@ const RE2 r_comment_only               {R"(^[[:space:]]*(?:[#;@]|//|/\*.*\*/).*$
 const RE2 r_label_reference            {R"(\.[A-Z_a-z][$.0-9A-Z_a-z]*)"};
 const RE2 r_defines_global             {R"(^[[:space:]]*\.globa?l[[:space:]]*([.A-Z_a-z][$.0-9A-Z_a-z]*))"};
 const RE2 r_defines_function_or_object {R"(^[[:space:]]*\.type[[:space:]]*(.*),[[:space:]]*[%@])"};
-const RE2 r_main_file_name             {R"(^[[:space:]]*\.file[[:space:]]+\"([^\"]+)\"$)"};
-const RE2 r_source_file_hint           {R"(^[[:space:]]*\.file[[:space:]]+([[:digit:]]+)(?:[[:space:]]+\"([^\"]+)\")?[[:space:]]+\"([^\"]+)\"(?:[[:space:]]+md5[[:space:]]+(0x[[:xdigit:]]+))?.*)"};
+const RE2 r_file_directive             {R"(^[[:space:]]*\.file[[:space:]]+([[:digit:]]+)(?:[[:space:]]+\"([^\"]+)\")?[[:space:]]+\"([^\"]+)\"(?:[[:space:]]+md5[[:space:]]+(0x[[:xdigit:]]+))?.*)"};
 const RE2 r_source_tag                 {R"(^[[:space:]]*\.loc[[:space:]]+([[:digit:]]+)[[:space:]]+([[:digit:]]+).*)"};
 const RE2 r_source_stab                {R"(^.*\.stabn[[:space:]]+([[:digit:]]+),0,([[:digit:]]+),.*)"};
 const RE2 r_endblock                   {R"(\.(?:cfi_endproc|data|section|text))"};
@@ -151,12 +154,13 @@ const RE2 r_data_defn                  {R"(^[[:space:]]*\.(string|asciz|ascii|[1
 // clang-format on
 
 struct file_info {
-  std::string filename;
-  std::string directory;
-  std::string md5_checksum;
+  std::set<size_t> tags;
+  std::string_view directory;
+  std::string_view filename;
+  std::string_view md5;
 
   bool operator==(const file_info& other) const noexcept {
-    if (!md5_checksum.empty())      return md5_checksum == other.md5_checksum;
+    if (!md5.empty())               return md5 == other.md5;
     if (filename == other.filename) return true;
     return false;  // TODO check with directory and basename
   }
@@ -166,16 +170,15 @@ struct parser_state {
   std::unordered_map<label_t, std::vector<label_t>> routines;
   std::unordered_set<label_t> globals{};
   std::optional<label_t> current_global{};
-  std::optional<std::set<label_t>> main_file_tag{};
-  std::optional<size_t> main_file_no{};
-  std::optional<std::string> main_file_name{};
+  // The "main_file" is the source file in which we're interested.
+  // For now, we just set it to the _first_ '.file' directive (DWARF5,
+  // presumably) we encounter in the assembly output.
+  std::optional<file_info> main_file{};
   std::unordered_set<label_t> main_file_routines{};
   std::unordered_set<label_t> used_labels{};
 
   // Internal linemap using map/set for efficient merging
   std::map<linum_t, std::set<std::pair<linum_t, linum_t>>> internal_linemap{};
-
-  std::unordered_map<size_t, file_info> file_table{};
 
   void register_mapping(linum_t source_linum, linum_t asm_linum) {
     auto [probe, inserted] =
@@ -218,8 +221,8 @@ struct parser_state {
 namespace utils {}  // namespace utils
 
 void intermediate(parser_state& s, const annotation_options& o) {
-  if (!s.main_file_tag || s.main_file_tag->empty())
-    throw std::runtime_error("Cannot proceed without a 'main_file_tag'");
+  if (!s.main_file)
+    utils::throwf<std::runtime_error>("Cannot proceed without a 'main_file'");
   if (o.preserve_library_functions) {
     for (auto&& [label, callees] : s.routines) {
       s.used_labels.insert(label);
@@ -282,38 +285,28 @@ auto first_pass(
               match(r_defines_global) || match(r_defines_function_or_object)) {
             LOG_TRACE("FP2.3 '{}'", *it);
             s.globals.insert(matches[1]);
-          } else if (match(r_source_file_hint)) {
+          } else if (match(r_file_directive)) {
             LOG_TRACE("FP2.4 '{}'", *it);
-            // Parse .file directive with DWARF-5 support
             // Format: .file fileno [dirname] filename [md5 value]
-
-            auto fileno_opt = utils::to_size_t(matches[1]);
-            if (fileno_opt) {
-              auto fileno = *fileno_opt;
-
-              auto& info = s.file_table[fileno];
-              info.directory = matches[2];
-              info.filename = matches[3] == "-" ? "<stdin>" : matches[3];
-              info.md5_checksum = matches[4];
-
-              LOG_DEBUG(
-                  "FP2.4.1 added file {} -> {} dir={} md5={}", fileno,
-                  info.filename, info.directory, info.md5_checksum);
-
-              if (!s.main_file_name) {
-                s.main_file_name = info.filename;
-                s.main_file_tag.emplace();
-                s.main_file_no = fileno;
-              }
-              // here main_file_name and main_file_no is set
-              if (s.file_table[*s.main_file_no] == info) {
-                s.main_file_tag->emplace(matches[1]);
-              }
+            auto fileno = utils::to_size_t(matches[1]);
+            detail::file_info info{
+              .tags = {fileno},
+              .directory = matches[2],
+              .filename = matches[3] == "-" ? "<stdin>" : matches[3],
+              .md5 = matches[4]
+            };
+            LOG_DEBUG(
+                "FP2.4.1 added file {} -> {} dir={} md5={}", fileno,
+                info.filename, info.directory, info.md5);
+            if (!s.main_file) {
+              s.main_file = info;
+            } else if (*s.main_file == info) {
+              s.main_file->tags.insert(fileno);
             }
           } else if (match(r_source_tag)) {
             LOG_TRACE("FP2.5 '{}'", *it);
-            if (s.current_global && s.main_file_tag &&
-                s.main_file_tag->contains(matches[1])) {
+            if (s.current_global && s.main_file &&
+                s.main_file->tags.contains(utils::to_size_t(matches[1]))) {
               LOG_TRACE("FP2.5.1 '{}'", *it);
               s.main_file_routines.insert(*s.current_global);
             }
@@ -379,7 +372,8 @@ annotation_result second_pass(
           } else if (match(r_source_tag)) {
             LOG_TRACE("SP2.3 '{}'", *it);
             source_linum = [&]() -> std::optional<int> {
-              if (s.main_file_tag->contains(matches[1])) {
+              auto fileno = utils::to_size_t(matches[1]);
+              if (s.main_file->tags.contains(fileno)) {
                 return utils::to_size_t(matches[2]);
               } else {
                 return std::nullopt;
@@ -392,18 +386,16 @@ annotation_result second_pass(
             // 100    0x64     N_SO      path and name of source file
             // 132    0x84     N_SOL     Name of sub-source (#include) file.
             auto a = utils::to_size_t(matches[1]);
-            if (a) {
-              switch (a.value()) {
-                case 68:
-                  source_linum = utils::to_size_t(matches[2]);
-                  break;
-                case 100:
-                case 132:
-                  source_linum = std::nullopt;
-                  break;
-                default: {
-                }
-              }
+            switch (a) {
+            case 68:
+              source_linum = utils::to_size_t(matches[2]);
+              break;
+            case 100:
+            case 132:
+              source_linum = std::nullopt;
+              break;
+            default: {
+            }
             }
           } else if (match(r_endblock)) {
             LOG_TRACE("SP2.5 '{}'", *it);
