@@ -40,5 +40,11 @@
   "command": "/usr/bin/clang++ -std=c++23 -g -O0 -o fxt_clang_preserve_library_functions.o -c fxt_clang_preserve_library_functions.cpp",
   "file": "fxt_clang_preserve_library_functions.cpp",
   "output": "fxt_clang_preserve_library_functions.o"
+},
+{
+  "directory": ".",
+  "command": "/usr/bin/clang++ -std=c++23 -g -O2 -o fxt_clang_demangle.o -c fxt_clang_demangle.cpp",
+  "file": "fxt_clang_demangle.cpp",
+  "output": "fxt_clang_demangle.o"
 }
 ]

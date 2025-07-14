@@ -65,3 +65,25 @@ add_test(
         ${CMAKE_SOURCE_DIR}/test/fixture/fxt_clang_preserve_library_functions.cpp
         ${CMAKE_SOURCE_DIR}/test/fixture/fxt_clang_preserve_library_functions.json
 )
+
+# Test CLI with clang++ demangle support
+add_test(
+    NAME cli_clang_demangle
+    COMMAND ${CMAKE_SOURCE_DIR}/test/blot_and_compare.sh
+        --demangle
+        $<TARGET_FILE:blot_exe>
+        ${CMAKE_SOURCE_DIR}/test/fixture/compile_commands.json
+        ${CMAKE_SOURCE_DIR}/test/fixture/fxt_clang_demangle.cpp
+        ${CMAKE_SOURCE_DIR}/test/fixture/fxt_clang_demangle.json
+)
+
+# Test CLI with clang++ demangle support using stdin
+add_test(
+    NAME cli_stdin_clang_demangle
+    COMMAND ${CMAKE_SOURCE_DIR}/test/blot_and_compare.sh
+        --stdin --demangle
+        $<TARGET_FILE:blot_exe>
+        ${CMAKE_SOURCE_DIR}/test/fixture/compile_commands.json
+        ${CMAKE_SOURCE_DIR}/test/fixture/fxt_clang_demangle.cpp
+        ${CMAKE_SOURCE_DIR}/test/fixture/fxt_clang_demangle.json
+)

@@ -1,0 +1,21 @@
+{
+  "assembly": [
+    "math::complex_function():           # @math::complex_function()",
+    "\tretq",
+    "main:                                   # @main",
+    "\tmovl\t$8, %eax",
+    "\tretq"
+  ],
+  "line_mappings": [
+    {
+      "source_line": 15,
+      "asm_start": 2,
+      "asm_end": 2
+    },
+    {
+      "source_line": 23,
+      "asm_start": 4,
+      "asm_end": 5
+    }
+  ]
+}
