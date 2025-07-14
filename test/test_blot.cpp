@@ -107,40 +107,46 @@ struct TestFixture {
 // Global fixture instance
 TestFixture fixture;
 
-TEST_CASE("basic") {
+TEST_CASE("api_gcc_basic") {
   fixture.test_annotation_against_expectation(
-      "basic.cpp", "basic.json", fixture.ccj_path);
+      "fxt_gcc_basic.cpp", "fxt_gcc_basic.json", fixture.ccj_path);
 }
 
-TEST_CASE("still_pretty_basic") {
+TEST_CASE("api_gcc_still_pretty_basic") {
   fixture.test_annotation_against_expectation(
-      "still_pretty_basic.cpp", "still_pretty_basic.json", fixture.ccj_path);
+      "fxt_gcc_still_pretty_basic.cpp", "fxt_gcc_still_pretty_basic.json", fixture.ccj_path);
 }
 
-TEST_CASE("demangle") {
+TEST_CASE("api_gcc_demangle") {
   fixture.test_annotation_against_expectation(
-      "demangle.cpp", "demangle.json", fixture.ccj_path, {.demangle = true});
+      "fxt_gcc_demangle.cpp", "fxt_gcc_demangle.json", fixture.ccj_path, {.demangle = true});
 }
 
-TEST_CASE("preserve_directives") {
+TEST_CASE("api_gcc_preserve_directives") {
   fixture.test_annotation_against_expectation(
-      "preserve_directives.cpp", "preserve_directives.json", fixture.ccj_path,
+      "fxt_gcc_preserve_directives.cpp", "fxt_gcc_preserve_directives.json", fixture.ccj_path,
       {.preserve_directives = true, .preserve_comments = true});
 }
 
-TEST_CASE("preserve_library_functions") {
+TEST_CASE("api_gcc_preserve_library_functions") {
   fixture.test_annotation_against_expectation(
-      "preserve_library_functions.cpp", "preserve_library_functions.json", fixture.ccj_path,
+      "fxt_gcc_preserve_library_functions.cpp", "fxt_gcc_preserve_library_functions.json", fixture.ccj_path,
       {.preserve_library_functions = true});
 }
 
-TEST_CASE("no_preserve_library_functions") {
+TEST_CASE("api_gcc_no_preserve_library_functions") {
   fixture.test_annotation_against_expectation(
-      "preserve_library_functions.cpp", "preserve_library_functions_off.json", fixture.ccj_path,
+      "fxt_gcc_preserve_library_functions.cpp", "fxt_gcc_no_preserve_library_functions.json", fixture.ccj_path,
       {.preserve_library_functions = false});
 }
 
-TEST_CASE("minimal") {
+TEST_CASE("api_gcc_minimal") {
   fixture.test_annotation_against_expectation(
-      "minimal.cpp", "minimal.json", fixture.ccj_path);
+      "fxt_gcc_minimal.cpp", "fxt_gcc_minimal.json", fixture.ccj_path);
+}
+
+TEST_CASE("api_clang_preserve_library_functions") {
+  fixture.test_annotation_against_expectation(
+      "fxt_clang_preserve_library_functions.cpp", "fxt_clang_preserve_library_functions.json", fixture.ccj_path,
+      {.preserve_library_functions = true});
 }

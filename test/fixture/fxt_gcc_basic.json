@@ -1,0 +1,37 @@
+{
+  "assembly": [
+    "_Z3foov:",
+    "\tmovl\t$42, %eax",
+    "\tret",
+    ".LC0:",
+    "\t.string\t\"Hello world, \"",
+    ".LC1:",
+    "\t.string\t\"!\\n\"",
+    "main:",
+    "\tsubq\t$8, %rsp",
+    "\tleaq\t.LC0(%rip), %rsi",
+    "\tleaq\t_ZSt4cout(%rip), %rdi",
+    "\tcall\t_ZStlsISt11char_traitsIcEERSt13basic_ostreamIcT_ES5_PKc@PLT",
+    "\tmovl\t$42, %esi",
+    "\tmovq\t%rax, %rdi",
+    "\tcall\t_ZNSolsEi@PLT",
+    "\tleaq\t.LC1(%rip), %rsi",
+    "\tmovq\t%rax, %rdi",
+    "\tcall\t_ZStlsISt11char_traitsIcEERSt13basic_ostreamIcT_ES5_PKc@PLT",
+    "\txorl\t%eax, %eax",
+    "\taddq\t$8, %rsp",
+    "\tret"
+  ],
+  "line_mappings": [
+    {
+      "source_line": 3,
+      "asm_start": 2,
+      "asm_end": 3
+    },
+    {
+      "source_line": 5,
+      "asm_start": 9,
+      "asm_end": 21
+    }
+  ]
+}
