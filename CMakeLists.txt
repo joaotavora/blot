@@ -66,3 +66,6 @@ enable_testing()
 # Use doctest's test discovery to register individual test cases
 include(doctest)
 doctest_discover_tests(test_blot)
+
+# Add system tests for blot executable
+include(test/system_tests.cmake)
