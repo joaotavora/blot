@@ -150,3 +150,9 @@ TEST_CASE("api_clang_preserve_library_functions") {
       "fxt_clang_preserve_library_functions.cpp", "fxt_clang_preserve_library_functions.json", fixture.ccj_path,
       {.preserve_library_functions = true});
 }
+
+TEST_CASE("api_clang_demangle") {
+  fixture.test_annotation_against_expectation(
+      "fxt_clang_demangle.cpp", "fxt_clang_demangle.json", fixture.ccj_path,
+      {.demangle = true});
+}
