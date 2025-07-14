@@ -21,9 +21,10 @@ using matches_t = std::span<match_t>;
 using label_t = std::string_view;
 
 namespace utils {
-template<typename Exception, typename... Args>
-[[noreturn]] void throwf(fmt::format_string<Args...> format_str, Args&&... args) {
-    throw Exception(fmt::format(format_str, std::forward<Args>(args)...));
+template <typename Exception, typename... Args>
+[[noreturn]] void throwf(
+    fmt::format_string<Args...> format_str, Args&&... args) {
+  throw Exception(fmt::format(format_str, std::forward<Args>(args)...));
 }
 
 template <typename Dest, typename T, size_t N, std::size_t... Is>
@@ -37,11 +38,10 @@ constexpr auto make_pointer_array(std::array<T, N>& values) {
   return make_pointer_array_impl<Dest>(values, std::make_index_sequence<N>{});
 }
 
-size_t to_size_t(std::string_view sv) { // "or lose" semantics
+size_t to_size_t(std::string_view sv) {  // "or lose" semantics
   size_t result{};
   auto [ptr, ec] = std::from_chars(sv.begin(), sv.end(), result);
-  if (ec == std::errc{} && ptr == sv.end())
-    return result;
+  if (ec == std::errc{} && ptr == sv.end()) return result;
   utils::throwf<std::runtime_error>("'{}' isn't a number!", sv);
 }
 
@@ -160,7 +160,7 @@ struct file_info {
   std::string_view md5;
 
   bool operator==(const file_info& other) const noexcept {
-    if (!md5.empty())               return md5 == other.md5;
+    if (!md5.empty()) return md5 == other.md5;
     if (filename == other.filename) return true;
     return false;  // TODO check with directory and basename
   }
@@ -293,8 +293,7 @@ auto first_pass(
               .tags = {fileno},
               .directory = matches[2],
               .filename = matches[3] == "-" ? "<stdin>" : matches[3],
-              .md5 = matches[4]
-            };
+              .md5 = matches[4]};
             LOG_DEBUG(
                 "FP2.4.1 added file {} -> {} dir={} md5={}", fileno,
                 info.filename, info.directory, info.md5);
@@ -387,15 +386,15 @@ annotation_result second_pass(
             // 132    0x84     N_SOL     Name of sub-source (#include) file.
             auto a = utils::to_size_t(matches[1]);
             switch (a) {
-            case 68:
-              source_linum = utils::to_size_t(matches[2]);
-              break;
-            case 100:
-            case 132:
-              source_linum = std::nullopt;
-              break;
-            default: {
-            }
+              case 68:
+                source_linum = utils::to_size_t(matches[2]);
+                break;
+              case 100:
+              case 132:
+                source_linum = std::nullopt;
+                break;
+              default: {
+              }
             }
           } else if (match(r_endblock)) {
             LOG_TRACE("SP2.5 '{}'", *it);
@@ -412,41 +411,41 @@ annotation_result second_pass(
 std::vector<std::string> apply_demanglings(const annotation_result& result) {
   std::vector<std::string> output;
   output.reserve(result.output.size());
-  
+
   auto demangling_it = result.demanglings.begin();
-  
+
   for (const auto& line : result.output) {
     std::string demangled_line{line};
-    
+
     // Apply all demanglings that intersect with this line
     while (demangling_it != result.demanglings.end()) {
       const auto& [mangled_sv, demangled] = *demangling_it;
-      
+
       // Check if mangled_sv is within this line
       if (mangled_sv.data() >= line.data() &&
           mangled_sv.data() + mangled_sv.size() <= line.data() + line.size()) {
         // Apply demangling to this line
         const char* pos = line.data();
         demangled_line.clear();
-        
+
         // Append text before the mangled symbol
         demangled_line.append(pos, mangled_sv.data());
         // Append the demangled symbol
         demangled_line.append(demangled);
         // Append text after the mangled symbol
-        demangled_line.append(mangled_sv.data() + mangled_sv.size(),
-                             line.data() + line.size());
-        
+        demangled_line.append(
+            mangled_sv.data() + mangled_sv.size(), line.data() + line.size());
+
         ++demangling_it;
       } else {
         // This demangling doesn't apply to current line, stop checking
         break;
       }
     }
-    
+
     output.push_back(std::move(demangled_line));
   }
-  
+
   return output;
 }
 
