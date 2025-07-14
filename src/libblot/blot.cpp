@@ -19,6 +19,7 @@ using input_t = xpto::linespan;
 using match_t = std::string_view;
 using matches_t = std::span<match_t>;
 using label_t = std::string_view;
+using demangling_t = std::pair<std::string_view, std::string>;
 
 namespace utils {
 template <typename Exception, typename... Args>
@@ -62,9 +63,7 @@ std::string demangle_symbol(std::string_view mangled) {
 
 template <typename Output, typename Input, typename F>
 void sweeping(
-    const Input& input, Output& output, const annotation_options& o, F fn,
-    std::vector<std::pair<std::string_view, std::string>>* demanglings =
-        nullptr) {
+    const Input& input, Output& output, const annotation_options& o, F fn) {
   size_t linum{1};
 
   std::array<match_t, 10> matches;
@@ -76,26 +75,6 @@ void sweeping(
 
     auto preserve = [&]() {
       linum++;
-
-      // Collect demangling information if requested
-      if (o.demangle && demanglings) {
-        std::string_view line = *it;
-        re2::StringPiece input_piece(line.data(), line.size());
-        re2::StringPiece match;
-
-        // Find all mangled symbols in this line
-        while (
-            RE2::FindAndConsume(&input_piece, R"((_Z[A-Za-z0-9_]+))", &match)) {
-          std::string_view mangled_sv(match.data(), match.size());
-          std::string demangled = utils::demangle_symbol(mangled_sv);
-
-          // Only store if demangling actually changed the symbol
-          if (demangled != mangled_sv) {
-            demanglings->emplace_back(mangled_sv, std::move(demangled));
-          }
-        }
-      }
-
       output.emplace_back(*it);
       ++it;
       done = true;
@@ -333,13 +312,34 @@ annotation_result second_pass(
   using output_t = std::vector<std::string_view>;
   output_t output;
 
-  std::vector<std::pair<std::string_view, std::string>> demanglings;
+  std::vector<demangling_t> demanglings;
 
   sweeping(
       input, output, options,
-      [&](auto preserve, auto kill, auto match_1, auto it, auto asm_linum) {
+      [&](auto preserve_1, auto kill, auto match_1, auto it, auto asm_linum) {
         matches_t matches{};
+
         auto match = [&](auto&& re) { return match_1(re, matches); };
+        // The "preserve" of second pass contains the demangling
+        // logic, and then calls the regular preserve_1().
+        auto preserve = [&]() {
+          // Collect demangling information if requested
+          if (options.demangle) {
+            std::string_view line = *it;
+            std::string_view mangled;
+
+            while (
+                RE2::FindAndConsume(&line, R"((_Z[A-Za-z0-9_]+))", &mangled)) {
+              std::string demangled = utils::demangle_symbol(mangled);
+
+              // Only store if demangling actually changed the symbol
+              if (demangled != mangled) {
+                demanglings.emplace_back(mangled, std::move(demangled));
+              }
+            }
+          }
+          preserve_1();
+        };
 
         if (it->at(0) != '\t') {
           if ((match(r_label_start))) {
@@ -401,8 +401,7 @@ annotation_result second_pass(
             reachable_label = std::nullopt;
           }
         }
-      },
-      &demanglings);
+      });
   return {output, s.get_linemap(), demanglings};
 }
 
@@ -415,37 +414,41 @@ std::vector<std::string> apply_demanglings(const annotation_result& result) {
   auto demangling_it = result.demanglings.begin();
 
   for (const auto& line : result.output) {
-    std::string demangled_line{line};
+    // Collect all demanglings that apply to this line
+    std::vector<detail::demangling_t> line_demanglings;
 
-    // Apply all demanglings that intersect with this line
     while (demangling_it != result.demanglings.end()) {
       const auto& [mangled_sv, demangled] = *demangling_it;
 
       // Check if mangled_sv is within this line
       if (mangled_sv.data() >= line.data() &&
-          mangled_sv.data() + mangled_sv.size() <= line.data() + line.size()) {
-        // Apply demangling to this line
-        const char* pos = line.data();
-        demangled_line.clear();
-
-        // Append text before the mangled symbol
-        demangled_line.append(pos, mangled_sv.data());
-        // Append the demangled symbol
-        demangled_line.append(demangled);
-        // Append text after the mangled symbol
-        demangled_line.append(
-            mangled_sv.data() + mangled_sv.size(), line.data() + line.size());
-
+        mangled_sv.data() + mangled_sv.size() <= line.data() + line.size()) {
+        line_demanglings.emplace_back(mangled_sv, demangled);
         ++demangling_it;
       } else {
         // This demangling doesn't apply to current line, stop checking
         break;
       }
     }
+    if (line_demanglings.empty()) {
+      output.push_back(std::string{line});
+    } else {
+      // Apply demanglings in reverse order (right-to-left) to avoid position
+      // shifts
+      std::string demangled_line{line};
+      for (auto it = line_demanglings.rbegin(); it != line_demanglings.rend();
+                                                ++it) {
+        const auto& [mangled_sv, demangled] = *it;
 
-    output.push_back(std::move(demangled_line));
+        // Find position of mangled symbol in current demangled_line
+        size_t offset = mangled_sv.data() - line.data();
+
+        // Replace the mangled symbol with demangled version
+        demangled_line.replace(offset, mangled_sv.size(), demangled);
+      }
+      output.push_back(std::move(demangled_line));
+    }
   }
-
   return output;
 }
 
