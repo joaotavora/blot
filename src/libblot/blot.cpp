@@ -1,6 +1,5 @@
 #include "blot/blot.hpp"
 
-#include <cxxabi.h>
 #include <re2/re2.h>
 
 #include <map>
@@ -11,22 +10,9 @@
 
 #include "linespan.hpp"
 #include "logger.hpp"
+#include "utils.hpp"
 
 namespace xpto::blot {
-
-namespace detail {
-using input_t = xpto::linespan;
-using match_t = std::string_view;
-using matches_t = std::span<match_t>;
-using label_t = std::string_view;
-using demangling_t = std::pair<std::string_view, std::string>;
-
-namespace utils {
-template <typename Exception, typename... Args>
-[[noreturn]] void throwf(
-    fmt::format_string<Args...> format_str, Args&&... args) {
-  throw Exception(fmt::format(format_str, std::forward<Args>(args)...));
-}
 
 template <typename Dest, typename T, size_t N, std::size_t... Is>
 constexpr auto make_pointer_array_impl(
@@ -46,20 +32,11 @@ size_t to_size_t(std::string_view sv) {  // "or lose" semantics
   utils::throwf<std::runtime_error>("'{}' isn't a number!", sv);
 }
 
-// Demangle C++ symbols using __cxa_demangle
-std::string demangle_symbol(std::string_view mangled) {
-  int status = 0;
-  std::string result{mangled};
-  char* demangled =
-      abi::__cxa_demangle(result.c_str(), nullptr, nullptr, &status);
-  if (status == 0 && demangled) {
-    result = demangled;
-    std::free(demangled);  // NOLINT
-  }
-  return result;
-}
-
-}  // namespace utils
+using input_t = xpto::linespan;
+using match_t = std::string_view;
+using matches_t = std::span<match_t>;
+using label_t = std::string_view;
+using demangling_t = std::pair<std::string_view, std::string>;
 
 template <typename Output, typename Input, typename F>
 void sweeping(
@@ -67,8 +44,8 @@ void sweeping(
   size_t linum{1};
 
   std::array<match_t, 10> matches;
-  auto match_ptrs = utils::make_pointer_array<const RE2::Arg>(matches);
-  auto arg_ptrs = utils::make_pointer_array<const RE2::Arg* const>(match_ptrs);
+  auto match_ptrs = make_pointer_array<const RE2::Arg>(matches);
+  auto arg_ptrs = make_pointer_array<const RE2::Arg* const>(match_ptrs);
 
   for (auto it = input.begin();;) {
     bool done{false};
@@ -197,8 +174,6 @@ struct parser_state {
   }
 };
 
-namespace utils {}  // namespace utils
-
 void intermediate(parser_state& s, const annotation_options& o) {
   if (!s.main_file)
     utils::throwf<std::runtime_error>("Cannot proceed without a 'main_file'");
@@ -267,8 +242,8 @@ auto first_pass(
           } else if (match(r_file_directive)) {
             LOG_TRACE("FP2.4 '{}'", *it);
             // Format: .file fileno [dirname] filename [md5 value]
-            auto fileno = utils::to_size_t(matches[1]);
-            detail::file_info info{
+            auto fileno = to_size_t(matches[1]);
+            file_info info{
               .tags = {fileno},
               .directory = matches[2],
               .filename = matches[3] == "-" ? "<stdin>" : matches[3],
@@ -284,7 +259,7 @@ auto first_pass(
           } else if (match(r_source_tag)) {
             LOG_TRACE("FP2.5 '{}'", *it);
             if (s.current_global && s.main_file &&
-                s.main_file->tags.contains(utils::to_size_t(matches[1]))) {
+                s.main_file->tags.contains(to_size_t(matches[1]))) {
               LOG_TRACE("FP2.5.1 '{}'", *it);
               s.main_file_routines.insert(*s.current_global);
             }
@@ -371,9 +346,9 @@ annotation_result second_pass(
           } else if (match(r_source_tag)) {
             LOG_TRACE("SP2.3 '{}'", *it);
             source_linum = [&]() -> std::optional<int> {
-              auto fileno = utils::to_size_t(matches[1]);
+              auto fileno = to_size_t(matches[1]);
               if (s.main_file->tags.contains(fileno)) {
-                return utils::to_size_t(matches[2]);
+                return to_size_t(matches[2]);
               } else {
                 return std::nullopt;
               }
@@ -384,10 +359,10 @@ annotation_result second_pass(
             // 68     0x44     N_SLINE   line number in text segment
             // 100    0x64     N_SO      path and name of source file
             // 132    0x84     N_SOL     Name of sub-source (#include) file.
-            auto a = utils::to_size_t(matches[1]);
+            auto a = to_size_t(matches[1]);
             switch (a) {
               case 68:
-                source_linum = utils::to_size_t(matches[2]);
+                source_linum = to_size_t(matches[2]);
                 break;
               case 100:
               case 132:
@@ -405,8 +380,6 @@ annotation_result second_pass(
   return {output, s.get_linemap(), demanglings};
 }
 
-}  // namespace detail
-
 std::vector<std::string> apply_demanglings(const annotation_result& result) {
   std::vector<std::string> output;
   output.reserve(result.output.size());
@@ -415,7 +388,7 @@ std::vector<std::string> apply_demanglings(const annotation_result& result) {
 
   for (const auto& line : result.output) {
     // Collect all demanglings that apply to this line
-    std::vector<detail::demangling_t> line_demanglings;
+    std::vector<demangling_t> line_demanglings;
 
     while (demangling_it != result.demanglings.end()) {
       const auto& [mangled_sv, demangled] = *demangling_it;
@@ -455,11 +428,11 @@ std::vector<std::string> apply_demanglings(const annotation_result& result) {
 annotation_result annotate(
     std::span<const char> input, const annotation_options& options) {
   xpto::linespan lspan{input};
-  detail::parser_state state{};
+  parser_state state{};
 
-  auto fp_output = detail::first_pass(lspan, state, options);
-  detail::intermediate(state, options);
-  return detail::second_pass(fp_output, state, options);
+  auto fp_output = first_pass(lspan, state, options);
+  intermediate(state, options);
+  return second_pass(fp_output, state, options);
 }
 
 }  // namespace xpto::blot

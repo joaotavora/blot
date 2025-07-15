@@ -46,5 +46,11 @@
   "command": "/usr/bin/clang++ -std=c++23 -g -O2 -o fxt_clang_demangle.o -c fxt_clang_demangle.cpp",
   "file": "fxt_clang_demangle.cpp",
   "output": "fxt_clang_demangle.o"
+},
+{
+  "directory": ".",
+  "command": "/usr/bin/c++ -std=c++23 -g -O2 -o fxt_gcc_errors.o -c fxt_gcc_errors.cpp",
+  "file": "fxt_gcc_errors.cpp",
+  "output": "fxt_gcc_errors.o"
 }
 ]

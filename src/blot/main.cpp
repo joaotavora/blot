@@ -10,6 +10,7 @@
 #include <span>
 
 #include "../libblot/logger.hpp"
+#include "../libblot/utils.hpp"
 #include "blot/assembly.hpp"
 #include "blot/blot.hpp"
 #include "blot/ccj.hpp"
@@ -19,42 +20,23 @@ namespace fs = std::filesystem;
 namespace blot = xpto::blot;
 namespace json = boost::json;
 
+using blot::utils::throwf;
 
-int main(int argc, char* argv[]) {  // NOLINT(*exception*)
-  xpto::blot::file_options fopts;
-  xpto::blot::annotation_options aopts{};
-  int loglevel{3};
-  bool json_output{false};
+auto grab_input(const blot::file_options& fopts) {
+  LOG_DEBUG(
+      "asm_file_name={}\nsrc_file_name={}\ncompile_commands_path={}",
+      fopts.asm_file_name, fopts.src_file_name, fopts.compile_commands_path);
 
   auto slurp = [](std::istream& in) -> std::string {
     return std::string{
       std::istreambuf_iterator<char>{in}, std::istreambuf_iterator<char>()};
   };
 
-  auto done =
-      parse_options(std::span(argv, argc), loglevel, fopts, aopts, json_output);
-  if (done) return done.value();
-
-  xpto::logger::set_level(static_cast<xpto::logger::level>(loglevel));
-
-  LOG_INFO("loglevel={}", loglevel);
-
-  LOG_DEBUG(
-      "-pd={}\n-pl={}\n-pc={}\n-pu={}\n-dm={}", aopts.preserve_directives,
-      aopts.preserve_library_functions, aopts.preserve_comments,
-      aopts.preserve_unused_labels, aopts.demangle);
-
-  LOG_DEBUG(
-      "asm_file_name={}\nsrc_file_name={}\ncompile_commands_path={}",
-      fopts.asm_file_name, fopts.src_file_name, fopts.compile_commands_path);
-
-  std::string input{};
-
   if (fopts.asm_file_name) {
     LOG_INFO("Reading from {}", *fopts.asm_file_name);
     std::ifstream fstream;
     fstream.open(*fopts.asm_file_name);
-    input = slurp(fstream);
+    return slurp(fstream);
   } else if (fopts.src_file_name) {
     fs::path ccj_path;
     if (fopts.compile_commands_path) {
@@ -62,26 +44,29 @@ int main(int argc, char* argv[]) {  // NOLINT(*exception*)
       LOG_INFO("Using provided compile_commands.json: {}", ccj_path);
     } else {
       auto ccj = xpto::blot::find_ccj();
-      if (!ccj) {
-        LOG_ERROR("Can't find compile_commands.json");
-        return -1;
-      }
+      if (!ccj) throwf("Can't find compile_commands.json");
       ccj_path = *ccj;
       LOG_INFO("Detected {}", ccj_path);
     }
     auto cmd = xpto::blot::find_compile_command(ccj_path, *fopts.src_file_name);
-    if (!cmd) {
-      LOG_ERROR("Can't find an entry for {}", *fopts.src_file_name);
-      return -1;
-    }
+    if (!cmd) throwf("Can't find an entry for {}", *fopts.src_file_name);
+
     LOG_INFO("Got this command '{}'", cmd->command);
 
-    input = xpto::blot::get_asm(cmd->directory, cmd->command, cmd->file);
+    return xpto::blot::get_asm(cmd->directory, cmd->command, cmd->file);
   } else {
     LOG_INFO("Reading from stdin");
-    input = slurp(std::cin);
+    return slurp(std::cin);
   }
+}
 
+auto annotate(const std::string& input,
+              const blot::annotation_options& aopts,
+              bool json_output) {
+  LOG_DEBUG(
+      "-pd={}\n-pl={}\n-pc={}\n-pu={}\n-dm={}", aopts.preserve_directives,
+      aopts.preserve_library_functions, aopts.preserve_comments,
+      aopts.preserve_unused_labels, aopts.demangle);
   LOG_INFO("Annotating {} bytes of asm", input.length());
   auto result = xpto::blot::annotate(input, aopts);
 
@@ -108,6 +93,35 @@ int main(int argc, char* argv[]) {  // NOLINT(*exception*)
     auto output_lines = xpto::blot::apply_demanglings(result);
     for (const auto& line : output_lines) {
       std::cout << line << "\n";
+    }
+  }
+}
+
+int main(int argc, char* argv[]) {
+  xpto::blot::file_options fopts{};
+  xpto::blot::annotation_options aopts{};
+  int loglevel{3};
+  bool json_output{false};
+
+  auto done =
+    parse_options(std::span(argv, argc), loglevel, fopts, aopts, json_output);
+  if (done) return done.value();
+
+  xpto::logger::set_level(static_cast<xpto::logger::level>(loglevel));
+  LOG_DEBUG("loglevel={}", loglevel);
+
+  try {
+    auto input = grab_input(fopts);
+    annotate(input, aopts, json_output);
+  } catch (std::exception& e) {
+    if (json_output) {
+      json::object json_result;
+      json_result["error"] = blot::utils::demangle_symbol(typeid(e).name());
+      json_result["details"] = e.what();
+      std::cout << json::serialize(json_result) << "\n";
+    } else {
+      std::cerr << e.what() << "\n";
+      return -1;
     }
   }
 }
