@@ -14,6 +14,7 @@
 #include "blot/assembly.hpp"
 #include "blot/blot.hpp"
 #include "blot/ccj.hpp"
+#include "blot/infer.hpp"
 #include "options.hpp"
 
 namespace fs = std::filesystem;
@@ -98,6 +99,8 @@ auto annotate(const std::string& input,
 }
 
 int main(int argc, char* argv[]) {
+
+  xpto::blot::infer();
   xpto::blot::file_options fopts{};
   xpto::blot::annotation_options aopts{};
   int loglevel{3};
