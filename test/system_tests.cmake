@@ -87,3 +87,13 @@ add_test(
         ${CMAKE_SOURCE_DIR}/test/fixture/fxt_clang_demangle.cpp
         ${CMAKE_SOURCE_DIR}/test/fixture/fxt_clang_demangle.json
 )
+
+# Test CLI error handling with JSON output
+add_test(
+    NAME cli_gcc_errors
+    COMMAND ${CMAKE_SOURCE_DIR}/test/blot_and_compare.sh
+        $<TARGET_FILE:blot_exe>
+        ${CMAKE_SOURCE_DIR}/test/fixture/compile_commands.json
+        ${CMAKE_SOURCE_DIR}/test/fixture/fxt_gcc_errors.cpp
+        ${CMAKE_SOURCE_DIR}/test/fixture/fxt_gcc_errors.json
+)

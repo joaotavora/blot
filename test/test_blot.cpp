@@ -156,3 +156,14 @@ TEST_CASE("api_clang_demangle") {
       "fxt_clang_demangle.cpp", "fxt_clang_demangle.json", fixture.ccj_path,
       {.demangle = true});
 }
+
+TEST_CASE("api_gcc_errors") {
+  // This test verifies that compilation errors are properly handled
+  auto cmd = xpto::blot::find_compile_command(fixture.ccj_path, "fxt_gcc_errors.cpp");
+  REQUIRE(cmd.has_value());
+  
+  // The get_asm function should throw when compilation fails
+  CHECK_THROWS_AS(
+      xpto::blot::get_asm(cmd->directory, cmd->command, cmd->file),
+      std::runtime_error);
+}
