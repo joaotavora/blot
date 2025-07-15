@@ -46,10 +46,6 @@ if(CMAKE_BUILD_TYPE STREQUAL "Debug")
   target_link_options(blot_exe PRIVATE "-fsanitize=address,undefined")
 endif()
 
-# Test fixture library - shows up in compile_commands.json
-file(GLOB fixture_sources CONFIGURE_DEPENDS test/fixture/*.cpp)
-add_library(fixture ${fixture_sources})
-
 # Generate test configuration header
 configure_file(test/test_config.h.in test/test_config.h)
 
