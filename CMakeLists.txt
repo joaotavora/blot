@@ -17,6 +17,7 @@ find_package(Boost REQUIRED COMPONENTS process json)
 find_package(Fmt REQUIRED)
 find_package(CLI11 REQUIRED)
 find_package(doctest REQUIRED)
+find_package(Clang REQUIRED)
 
 # Core blot library
 file(GLOB lib_sources CONFIGURE_DEPENDS src/libblot/*.cpp)
@@ -28,6 +29,7 @@ target_link_libraries(blot_lib PUBLIC
   Boost::process
   Boost::json
   fmt::fmt
+  libclang
 )
 target_compile_definitions(blot_lib PUBLIC LOG_NO_TIMESTAMP ON)
 
@@ -35,7 +37,7 @@ target_compile_definitions(blot_lib PUBLIC LOG_NO_TIMESTAMP ON)
 file(GLOB blot_sources CONFIGURE_DEPENDS src/blot/*.cpp)
 add_executable(blot_exe ${blot_sources})
 target_include_directories(blot_exe PRIVATE include)
-target_link_libraries(blot_exe PRIVATE 
+target_link_libraries(blot_exe PRIVATE
   blot_lib
   CLI11::CLI11
 )
