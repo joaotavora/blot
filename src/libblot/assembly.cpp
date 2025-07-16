@@ -1,6 +1,7 @@
 #include "blot/assembly.hpp"
 
 #include <fmt/std.h>
+#include <re2/re2.h>
 
 #define BOOST_PROCESS_USE_STD_FS 1
 
@@ -32,6 +33,34 @@ auto args_to_string(std::string res, std::vector<std::string>& args) {
   return res;
 }
 
+std::string get_compiler_version(const std::string& compiler) {
+  asio::io_context ctx;
+  asio::readable_pipe rp_out{ctx};
+  std::string output;
+
+  p2::process proc{
+    ctx,
+    compiler,
+    {"--version"},
+    p2::process_stdio{.in = nullptr, .out = rp_out, .err = nullptr}};
+
+  boost::system::error_code ec;
+  asio::read(rp_out, asio::dynamic_buffer(output), ec);
+  proc.wait();
+
+  // Parse version from output using RE2
+  static const RE2 gcc_re(R"((?:gcc|GCC)\)?\s*(\d+\.\d+\.\d+))");
+  static const RE2 clang_re(R"(clang.*?(\d+\.\d+\.\d+))");
+
+  std::string version;
+  if (RE2::PartialMatch(output, gcc_re, &version) ||
+      RE2::PartialMatch(output, clang_re, &version)) {
+    return version;
+  }
+
+  return "<unknown>";
+}
+
 // Run the compiler with modified command to generate assembly
 compilation_result get_asm(
     const fs::path& directory, const std::string& command,
@@ -42,13 +71,19 @@ compilation_result get_asm(
   std::string compiler;
   iss >> compiler;
 
+  std::vector<std::string> original_args;
+  for (std::string arg{}; iss >> arg;) original_args.push_back(arg);
+
+  std::string compiler_version = get_compiler_version(compiler);
+
   std::vector<std::string> args;
   bool had_dash_c = false;
 
-  for (std::string arg{}; iss >> arg;) {
+  for (size_t i = 0; i < original_args.size(); ++i) {
+    auto arg = original_args[i];
     // Skip output specifiers (and the next argument, too)
     if (arg.substr(0, 2) == "-o") {
-      iss >> arg;
+      ++i;  // skip next argument too
       continue;
     } else if (arg.substr(0, 2) == "-c") {
       arg = "-S";
@@ -64,8 +99,7 @@ compilation_result get_asm(
     args.push_back("-S");
     args.push_back(file);
   }
-
-  // Output to stdout
+  // Add -o - to output to stdout
   args.push_back("-o");
   args.push_back("-");
 
@@ -94,15 +128,16 @@ compilation_result get_asm(
 
   auto exit_code = proc.wait();
   if (exit_code != 0) {
-    // TODO, find some other way to get this info out and possibly
-    // into JSON output.
     fmt::print(stderr, "{}", error_output);
     throw compilation_error{
-      fmt::format("Compiler failed with exit code {}",
-          exit_code), {compiler, args}};
+      fmt::format("Compiler failed with exit code {}", exit_code),
+      {compiler, args, directory, compiler_version},
+      std::move(error_output)};
   }
 
-  return {.assembly = output, .invocation = {compiler, args, directory}};
+  return {
+    .assembly = output,
+    .invocation = {compiler, args, directory, compiler_version}};
 }
 
 }  // namespace xpto::blot

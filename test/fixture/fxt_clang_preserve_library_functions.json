@@ -11,8 +11,7 @@
     "source_file": "test/fixture/fxt_clang_preserve_library_functions.cpp"
   },
   "compiler_invocation": {
-    "compiler_version": null,
-    "stdlib_version": null,
+    "compiler_version": "20.1.8",
     "compiler": "/usr/bin/clang++",
     "args": [
       "-std=c++23",
