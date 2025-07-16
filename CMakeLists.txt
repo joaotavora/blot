@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.30)
-project(blot LANGUAGES CXX)
+project(blot LANGUAGES CXX C)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(CMAKE_CXX_STANDARD 23)
 
@@ -52,7 +52,7 @@ endif()
 configure_file(test/test_config.h.in test/test_config.h)
 
 # Doctest runner
-add_executable(test_blot test/test_blot.cpp)
+add_executable(test_blot test/main.cpp test/annotation_tests.cpp test/infer_tests.cpp)
 target_include_directories(test_blot PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/test)
 target_link_libraries(test_blot PRIVATE
   blot_lib
