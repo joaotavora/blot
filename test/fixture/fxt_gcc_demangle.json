@@ -11,8 +11,7 @@
     "source_file": "test/fixture/fxt_gcc_demangle.cpp"
   },
   "compiler_invocation": {
-    "compiler_version": null,
-    "stdlib_version": null,
+    "compiler_version": "15.1.1",
     "compiler": "/usr/bin/c++",
     "args": [
       "-std=c++23",
