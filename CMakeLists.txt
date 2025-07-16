@@ -67,3 +67,6 @@ doctest_discover_tests(test_blot)
 
 # Add system tests for blot executable
 include(test/system_tests.cmake)
+
+# Utility targets
+include(cmake/utils.cmake)
