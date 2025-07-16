@@ -34,6 +34,12 @@
       "displayName": "Format Code",
       "configurePreset": "debug",
       "targets": ["format"]
+    },
+    {
+      "name": "regenerate-fixtures",
+      "displayName": "Regenerate Fixtures",
+      "configurePreset": "debug",
+      "targets": ["regenerate-fixtures"]
     }
   ],
   "testPresets": [

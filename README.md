@@ -36,6 +36,9 @@ ctest --preset=default
 
 # Format code
 cmake --build --preset=format
+
+# Regenerate test fixture files
+cmake --build --preset=regenerate-fixtures
 ```
 
 The `blot` program will live in `build-Debug/blot` or

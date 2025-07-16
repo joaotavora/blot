@@ -426,13 +426,19 @@ std::vector<std::string> apply_demanglings(const annotation_result& result) {
 }
 
 annotation_result annotate(
-    std::span<const char> input, const annotation_options& options) {
+    std::span<const char> input, const annotation_options& aopts) {
+  LOG_DEBUG(
+      "-pd={}\n-pl={}\n-pc={}\n-pu={}\n-dm={}", aopts.preserve_directives,
+      aopts.preserve_library_functions, aopts.preserve_comments,
+      aopts.preserve_unused_labels, aopts.demangle);
+  LOG_INFO("Annotating {} bytes of asm", input.size());
+
   xpto::linespan lspan{input};
   parser_state state{};
 
-  auto fp_output = first_pass(lspan, state, options);
-  intermediate(state, options);
-  return second_pass(fp_output, state, options);
+  auto fp_output = first_pass(lspan, state, aopts);
+  intermediate(state, aopts);
+  return second_pass(fp_output, state, aopts);
 }
 
 }  // namespace xpto::blot
