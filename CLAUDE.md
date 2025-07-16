@@ -5,23 +5,15 @@ working with code in this repository.  Actually, it should provide
 guidance to anyone wanting to contribute to this, this is sort of a
 `CONTRIBUTING.md`.
 
+Claude and other AI's and anyone reading this should of course also
+read `README.md`.
+
 ## Dev builds
 
 This is a CMake-based C++23 project using modern build practices.
+Refer to `README.md` and it's "Build" section.
 
-```bash
-# Debug build (recommended for development)
-BUILD_TYPE=Debug
-BUILD_DIR=build-$BUILD_TYPE
-cmake -B $BUILD_DIR -DCMAKE_BUILD_TYPE=$BUILD_TYPE
-cmake --build $BUILD_DIR -j
-
-# Release build
-BUILD_TYPE=Release
-BUILD_DIR=build-$BUILD_TYPE
-cmake -B $BUILD_DIR -DCMAKE_BUILD_TYPE=$BUILD_TYPE
-cmake --build $BUILD_DIR -j
-
+```
 # Run the tool (see README for more ways to run it)
 echo 'int main() { return 42; }' | g++ -S -g -x c++ - -o - | build-Debug/blot
 ```
@@ -32,7 +24,10 @@ build directories, with a symlink at the project root pointing to
 
 ## Non-dev builds
 
-There are none.  If you want to vendor this you're on your own for now.
+There are so far.  No Cmake `install` target.  No way to
+`addSubdirectory` this `CMakeLists.txt` file.  `fetchContent` won't
+work for the same reason.  So if someone wants to vendor this you're
+on your own for now :-)
 
 ## Package manager
 
@@ -42,9 +37,12 @@ Cmake can find them.
 
 ## Project Architecture
 
-Blot is a compiler-explorer clone that works with your local
-toolchain and project. It processes assembly output to create
+Blot is a compiler-explorer clone that works with your local toolchain
+and project. It's basic job is to processes assembly output to create
 annotated, cleaned assembly with source-to-assembly line mappings.
+
+Another main feature (and presumably its main added value) is that it
+knows how to invoke your project's compilers appropriate for the user.
 
 ### Core Components
 
@@ -59,6 +57,8 @@ annotated, cleaned assembly with source-to-assembly line mappings.
 - `blot.hpp` - Core annotation interface and types
 - `assembly.hpp` - Assembly generation interface
 - `ccj.hpp` - Compile commands interface
+- `infer.hpp` - Given a header file, infers translation unit to
+  compile (could perhaps be merged with `ccj.hpp`)
 
 #### Implementation (`src/libblot/`)
 - `blot.cpp` - Core annotation engine with two-pass processing and C++ demangling
@@ -94,21 +94,31 @@ annotated, cleaned assembly with source-to-assembly line mappings.
 
 - CLI11: Command-line argument parsing
 
+- libclang: C/C++ file parsing.  From LLVM
+
 ### Testing
 
-The project has a comprehensive (ahem...) test suite with two distinct
-test families:
+The project has a comprehensive (ahem...) test suite with distinct
+test families.  The C++ API tests use the `doctest` framework, the
+others with Cmake and some sh scripts.
 
-#### API Tests (`test/test_blot.cpp`)
+#### End-to-end API Tests (`test/annotation_tests.cpp`)
 
 - Naming: Prefixed with `api_` (e.g., `api_basic`, `api_demangle`)
 
 - Purpose: Test the core library functions directly using doctest
 
-- Approach: Call `xpto::blot::annotate()` and compare results against
-  expected JSON
+- Approach: Call `xpto::blot::find_compile_command` to get the
+  command, then `xpto::blot::get_asm` to get the asm, then
+  `xpto::blot::annotate()` to get the annotation.  Then compare
+  results against expected JSON.  Come to think of this these are
+  `api` "integration" tests, but
 
-- Framework: Uses doctest for test execution and assertions
+#### Inference API Tests (`test/infer_tests.cpp`)
+
+- Naming: prefix with `api_infer_`.
+
+- Purpose: test just the includer-inferring part
 
 #### CLI Tests (`test/system_tests.cmake`)
 
@@ -121,20 +131,35 @@ test families:
 - Implementation: Uses custom script `test/blot_and_compare.sh` for
   JSON comparison
 
-#### Test Fixtures (`test/fixture/`)
+### Test Fixtures (`test/fixture/`)
 
-- Naming: Prefixed with `fxt_` (e.g., `fxt_basic.cpp`,
-  `fxt_basic.json`)
+Inside this directory, we would find a fictitions project of sorts,
+whose only purpose is to help check Blot.  There is a
+`compile_commands.json`.
 
-- Shared Usage: Both API and CLI tests use the same fixture files
+Note that both API (C++) and CLI tests use the same fixture files.
 
-- Components:
-  - `fxt_*.cpp` - C++ source files for testing
-  - `fxt_*.json` - Expected JSON output for comparison
-  - `compile_commands.json` - Compile commands for fixture files
-  
-- Build Integration: Fixture files are compiled into a library for
-  `compile_commands.json` reference
+Files here:
+- `fxt_*.{cpp,hpp,h}` - C++ fixture source files for testing 
+- `fxt_*.json` - Expected fixture JSON output for comparison
+- `compile_commands.json` - Compile commands for fixture files
+
+The `fxt_*.json` files are generated with sth like:
+
+```blot --ccj test/fixture/compile_commands.json test/fixture/fxt_clang_preserve_library_functions.cpp -pl --json | jq``` 
+
+Where `-pl` was added there because this particular feature is
+specifically about testing the "preserve library functions"
+functionality.  
+
+### Challenges
+
+Obviously, the `blot` program should be working correctly be OK when
+making the test fixture, else it'll be like the blind leading the
+blind.
+
+Some (if not all) of the fixtures rely on compiler-specifics so these
+tests are probably extremely brittle.
 
 ### Build Configuration
 
@@ -147,12 +172,13 @@ test families:
 ### Code Organization
 
 - `include/blot/`: Public API headers only (blot.hpp,
-  assembly.hpp, ccj.hpp)
+  assembly.hpp, ccj.hpp, infer.hpp)
 
 - `src/libblot/`: Core implementation (blot.cpp, assembly.cpp,
-  ccj.cpp) and internal utilities (logger.hpp, linespan.hpp)
+  ccj.cpp) and internal utilities (logger.hpp, linespan.hpp,
+  utils.hpp, auto.hpp, etc)
 
-- `src/blot/`: Application-specific code (main.cpp,
+- `src/blot/`: Code specific to the CLI util (main.cpp,
   options.{hpp,cpp})
 
 - `test/fixture/`: Test files with dedicated compile_commands.json
@@ -162,30 +188,6 @@ and implementation details. Users of the library only need to include
 headers from `include/blot/`, while all internal utilities and
 implementation are encapsulated in `src/libblot/`.
 
-### Testing Strategy
-- Automated tests compare `xpto::blot::annotate()` output against
-  expected JSON
-
-- Generate expectations with `blot --json | jq` for human readability
-
-- Tests use real compile commands and call core functions directly
-
-- Next step: Integrate with Compiler Explorer API (godbolt.org/api)
-  for automated fixture generation and validation
-
-
-#### Running Tests
-```bash
-# Run all tests (doctest automatically provides clean output)
-build-Debug/test_blot
-
-# Run with CTest for individual test case reporting
-ctest --verbose
-
-# Regenerate test expectations from project root
-build-Debug/blot --compile_commands test/fixture/compile_commands.json test/fixture/fxt_basic.cpp --json | jq > test/fixture/fxt_basic.json
-```
-
 ### JSON Output Structure
 
 While the project is still young and in flux, this may change.  So
@@ -194,21 +196,4 @@ just look at one of the fixture files like
 
 ### Major Future Challenges
 
-#### Header File Support
-The Big Problem: Supporting assembly generation for header files
-(.hpp). Templates and inline functions in headers only generate code
-when instantiated. Solution requires:
-
-1. Walking inclusion graphs to find .cpp files that include the target header
-
-2. Finding suitable translation units that actually instantiate the
-   templates
-
-#### Unsaved Changes Support
-The BIGGEST Problem: Supporting unsaved editor buffers.
-
-Easy for .cpp files (pipe to stdin), but extremely difficult for
-headers. No known compiler supports compiling a filesystem-based
-translation unit while substituting piped stdin for specific #included
-headers during compilation. This is critical for live-coding workflows
-where users don't want to save files to see assembly changes.
+Read the `README.md` and its "Roadmap" section!
