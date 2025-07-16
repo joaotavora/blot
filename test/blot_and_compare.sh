@@ -7,6 +7,7 @@ set -e
 
 USE_STDIN=false
 BLOT_FLAGS=()
+JQ_FILTER='--sort-keys {assembly: .assembly, line_mappings: .line_mappings}'
 
 # Parse flags
 while [[ $# -gt 0 ]]; do
@@ -65,10 +66,10 @@ if [ "$USE_STDIN" = true ]; then
         | sed 's/$/ -o -/')
     cd "$(dirname "$CCJ")/$COMPILE_DIR"
     # Now, run the double pipe.
-    diff -u <(jq --sort-keys . "$EXPECTED_JSON")                               \
+    diff -u <(jq $JQ_FILTER "$EXPECTED_JSON")                                  \
            <(cat "$FILENAME" | eval "$ASM_CMD"                                 \
                              | "$BLOT_EXECUTABLE" "${BLOT_FLAGS[@]}" --json    \
-                             | jq --sort-keys .)
+                             | jq $JQ_FILTER)
 
     # For posterity, the "single pipe" setup would look like this:
     #
@@ -85,7 +86,7 @@ if [ "$USE_STDIN" = true ]; then
     #                           | jq --sort-keys .)
 else
     # Normal behavior: use --ccj flag
-    diff -u <(jq --sort-keys . "$EXPECTED_JSON")                               \
-            <("$BLOT_EXECUTABLE" "${BLOT_FLAGS[@]}" --ccj "$CCJ" "$SOURCE_FILE" \
-                --json | jq --sort-keys .)
+    diff -u <(jq $JQ_FILTER "$EXPECTED_JSON")                                  \
+            <("$BLOT_EXECUTABLE" "${BLOT_FLAGS[@]}" --ccj "$CCJ" "$SOURCE_FILE"\
+                --json | jq $JQ_FILTER)
 fi

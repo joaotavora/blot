@@ -1,4 +1,30 @@
 {
+  "annotation_options": {
+    "demangle": false,
+    "preserve_directives": false,
+    "preserve_library_functions": false,
+    "preserve_comments": false,
+    "preserve_unused_labels": false
+  },
+  "file_options": {
+    "compile_commands_path": "test/fixture/compile_commands.json",
+    "source_file": "test/fixture/fxt_gcc_minimal.cpp"
+  },
+  "compiler_invocation": {
+    "compiler_version": null,
+    "stdlib_version": null,
+    "compiler": "/usr/bin/c++",
+    "args": [
+      "-std=c++23",
+      "-g",
+      "-O2",
+      "-S",
+      "fxt_gcc_minimal.cpp",
+      "-g1",
+      "-o",
+      "-"
+    ]
+  },
   "assembly": [
     "main:",
     "\txorl\t%eax, %eax",
