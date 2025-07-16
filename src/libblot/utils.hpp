@@ -1,11 +1,12 @@
 #pragma once
 
-#include <fmt/format.h>
-#include <stdexcept>
 #include <cxxabi.h>
+#include <fmt/format.h>
+
+#include <stdexcept>
 
 namespace xpto::blot::utils {
-template <typename Exception=std::runtime_error, typename... Args>
+template <typename Exception = std::runtime_error, typename... Args>
 [[noreturn]] void throwf(
     fmt::format_string<Args...> format_str, Args&&... args) {
   throw Exception(fmt::format(format_str, std::forward<Args>(args)...));
@@ -24,4 +25,4 @@ inline std::string demangle_symbol(std::string_view mangled) {
   return result;
 }
 
-}
+}  // namespace xpto::blot::utils
