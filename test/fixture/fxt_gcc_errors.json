@@ -1,4 +1,11 @@
 {
-  "error": "std::runtime_error",
+  "annotation_options": {
+    "demangle": false,
+    "preserve_directives": false,
+    "preserve_library_functions": false,
+    "preserve_comments": false,
+    "preserve_unused_labels": false
+  },
+  "error": "xpto::blot::compilation_error",
   "details": "Compiler failed with exit code 1"
 }

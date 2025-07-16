@@ -33,7 +33,7 @@ auto args_to_string(std::string res, std::vector<std::string>& args) {
 }
 
 // Run the compiler with modified command to generate assembly
-std::string get_asm(
+compilation_result get_asm(
     const fs::path& directory, const std::string& command,
     const fs::path& file) {
   // Modify the command to generate assembly with debugging info
@@ -97,11 +97,12 @@ std::string get_asm(
     // TODO, find some other way to get this info out and possibly
     // into JSON output.
     fmt::print(stderr, "{}", error_output);
-    throw std::runtime_error(
-        fmt::format("Compiler failed with exit code {}", exit_code));
+    throw compilation_error{
+      fmt::format("Compiler failed with exit code {}",
+          exit_code), {compiler, args}};
   }
 
-  return output;
+  return {.assembly = output, .invocation = {compiler, args, directory}};
 }
 
 }  // namespace xpto::blot

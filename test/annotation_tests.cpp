@@ -36,27 +36,6 @@ struct TestFixture {
     fs::current_path(original_dir);
   }
 
-  // Load expected JSON file
-  json::object load_expected(const std::string& test_name) {
-    std::ifstream file(test_name + ".json");
-    REQUIRE(file.is_open());
-
-    std::string content(
-        (std::istreambuf_iterator<char>(file)),
-        std::istreambuf_iterator<char>());
-
-    auto parsed = json::parse(content);
-    return parsed.as_object();
-  }
-
-  // Generate assembly for a test file using compile commands
-  std::string generate_assembly(const std::string& test_file) {
-    auto cmd = xpto::blot::find_compile_command(ccj_path, test_file);
-    REQUIRE(cmd.has_value());
-
-    return xpto::blot::get_asm(cmd->directory, cmd->command, cmd->file);
-  }
-
   // Reusable test function for any fixture
   void test_annotation_against_expectation(
       const fs::path& cpp_file, const fs::path& expectation_file,
@@ -66,11 +45,11 @@ struct TestFixture {
     auto cmd =
         xpto::blot::find_compile_command(compile_commands_file, cpp_file);
     REQUIRE(cmd.has_value());
-    std::string assembly =
+    auto c_result =
         xpto::blot::get_asm(cmd->directory, cmd->command, cmd->file);
 
     // Run blot annotation with provided options
-    auto result = xpto::blot::annotate(assembly, aopts);
+    auto a_result = xpto::blot::annotate(c_result.assembly, aopts);
 
     // Load expected results
     std::ifstream file(expectation_file);
@@ -81,7 +60,7 @@ struct TestFixture {
     auto expected = json::parse(content).as_object();
 
     // Compare assembly output (apply demanglings)
-    auto output_lines = xpto::blot::apply_demanglings(result);
+    auto output_lines = xpto::blot::apply_demanglings(a_result);
     auto& expected_assembly = expected["assembly"].as_array();
     REQUIRE(output_lines.size() == expected_assembly.size());
     for (size_t i = 0; i < output_lines.size(); ++i) {
@@ -90,11 +69,11 @@ struct TestFixture {
 
     // Compare line mappings (new array format)
     auto& expected_mappings = expected["line_mappings"].as_array();
-    REQUIRE(result.linemap.size() == expected_mappings.size());
+    REQUIRE(a_result.linemap.size() == expected_mappings.size());
 
     for (size_t i = 0; i < expected_mappings.size(); ++i) {
       auto& expected_mapping = expected_mappings[i].as_object();
-      auto& [src_line, asm_start, asm_end] = result.linemap[i];
+      auto& [src_line, asm_start, asm_end] = a_result.linemap[i];
 
       CHECK(src_line == expected_mapping["source_line"].as_int64());
       CHECK(asm_start == expected_mapping["asm_start"].as_int64());
@@ -113,29 +92,34 @@ TEST_CASE("api_gcc_basic") {
 
 TEST_CASE("api_gcc_still_pretty_basic") {
   fixture.test_annotation_against_expectation(
-      "fxt_gcc_still_pretty_basic.cpp", "fxt_gcc_still_pretty_basic.json", fixture.ccj_path);
+      "fxt_gcc_still_pretty_basic.cpp", "fxt_gcc_still_pretty_basic.json",
+      fixture.ccj_path);
 }
 
 TEST_CASE("api_gcc_demangle") {
   fixture.test_annotation_against_expectation(
-      "fxt_gcc_demangle.cpp", "fxt_gcc_demangle.json", fixture.ccj_path, {.demangle = true});
+      "fxt_gcc_demangle.cpp", "fxt_gcc_demangle.json", fixture.ccj_path,
+      {.demangle = true});
 }
 
 TEST_CASE("api_gcc_preserve_directives") {
   fixture.test_annotation_against_expectation(
-      "fxt_gcc_preserve_directives.cpp", "fxt_gcc_preserve_directives.json", fixture.ccj_path,
+      "fxt_gcc_preserve_directives.cpp", "fxt_gcc_preserve_directives.json",
+      fixture.ccj_path,
       {.preserve_directives = true, .preserve_comments = true});
 }
 
 TEST_CASE("api_gcc_preserve_library_functions") {
   fixture.test_annotation_against_expectation(
-      "fxt_gcc_preserve_library_functions.cpp", "fxt_gcc_preserve_library_functions.json", fixture.ccj_path,
+      "fxt_gcc_preserve_library_functions.cpp",
+      "fxt_gcc_preserve_library_functions.json", fixture.ccj_path,
       {.preserve_library_functions = true});
 }
 
 TEST_CASE("api_gcc_no_preserve_library_functions") {
   fixture.test_annotation_against_expectation(
-      "fxt_gcc_preserve_library_functions.cpp", "fxt_gcc_no_preserve_library_functions.json", fixture.ccj_path,
+      "fxt_gcc_preserve_library_functions.cpp",
+      "fxt_gcc_no_preserve_library_functions.json", fixture.ccj_path,
       {.preserve_library_functions = false});
 }
 
@@ -146,7 +130,8 @@ TEST_CASE("api_gcc_minimal") {
 
 TEST_CASE("api_clang_preserve_library_functions") {
   fixture.test_annotation_against_expectation(
-      "fxt_clang_preserve_library_functions.cpp", "fxt_clang_preserve_library_functions.json", fixture.ccj_path,
+      "fxt_clang_preserve_library_functions.cpp",
+      "fxt_clang_preserve_library_functions.json", fixture.ccj_path,
       {.preserve_library_functions = true});
 }
 
@@ -158,9 +143,10 @@ TEST_CASE("api_clang_demangle") {
 
 TEST_CASE("api_gcc_errors") {
   // This test verifies that compilation errors are properly handled
-  auto cmd = xpto::blot::find_compile_command(fixture.ccj_path, "fxt_gcc_errors.cpp");
+  auto cmd =
+      xpto::blot::find_compile_command(fixture.ccj_path, "fxt_gcc_errors.cpp");
   REQUIRE(cmd.has_value());
-  
+
   // The get_asm function should throw when compilation fails
   CHECK_THROWS_AS(
       xpto::blot::get_asm(cmd->directory, cmd->command, cmd->file),
