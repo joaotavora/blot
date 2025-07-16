@@ -29,8 +29,10 @@ std::optional<compile_command> find_compile_command(
   json::value json_content = [&]() {
     std::ifstream blob(compile_commands_path.string());
     if (!blob) {
-      throw std::runtime_error(fmt::format(
-          "Could not open compile_commands.json at {}", compile_commands_path));
+      throw std::runtime_error(
+          fmt::format(
+              "Could not open compile_commands.json at {}",
+              compile_commands_path));
     }
 
     std::string content(
@@ -38,9 +40,10 @@ std::optional<compile_command> find_compile_command(
         std::istreambuf_iterator<char>());
     auto ret = json::parse(content);
     if (!ret.is_array()) {
-      throw std::runtime_error(std::format(
-          "Could not open compile_commands.json at {}",
-          compile_commands_path.string()));
+      throw std::runtime_error(
+          std::format(
+              "Could not open compile_commands.json at {}",
+              compile_commands_path.string()));
     }
     return ret;
   }();

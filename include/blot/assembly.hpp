@@ -13,12 +13,17 @@ struct compiler_invocation {
   std::string compiler;
   std::vector<std::string> args;
   fs::path directory;
+  std::string compiler_version;
 };
 
 struct compilation_error : std::runtime_error {
-  compilation_error(const std::string& desc, compiler_invocation i)
-      : std::runtime_error{desc}, invocation{std::move(i)} {}
+  compilation_error(
+      const std::string& desc, compiler_invocation i, std::string s)
+      : std::runtime_error{desc},
+        invocation{std::move(i)},
+        dribble{std::move(s)} {}
   compiler_invocation invocation;
+  std::string dribble;
 };
 
 struct compilation_result {

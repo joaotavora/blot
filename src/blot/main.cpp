@@ -12,6 +12,7 @@
 #include <type_traits>
 #include <variant>
 
+#include "../libblot/linespan.hpp"
 #include "../libblot/logger.hpp"
 #include "../libblot/utils.hpp"
 #include "blot/assembly.hpp"
@@ -100,8 +101,7 @@ json::object fopts_to_json(const blot::file_options& fopts) {
 
 json::object meta_to_json(const blot::compiler_invocation& inv) {
   json::object meta;
-  meta["compiler_version"] = nullptr;            // TODO: Get from compiler
-  meta["stdlib_version"] = nullptr;              // TODO: Get from compiler
+  meta["compiler_version"] = inv.compiler_version;
   meta["directory"] = inv.directory.c_str();
   meta["compiler"] = inv.compiler;
   meta["args"] = json::array(inv.args.begin(), inv.args.end());
@@ -127,6 +127,13 @@ json::object annotate_to_json(
   res["assembly"] = assembly_lines;
   res["line_mappings"] = line_mappings;
 
+  return res;
+}
+
+json::object error_to_json(const std::exception& e) {
+  json::object res;
+  res["name"] = blot::utils::demangle_symbol(typeid(e).name());
+  res["details"] = e.what();
   return res;
 }
 
@@ -173,6 +180,7 @@ int main(int argc, char* argv[]) {
   int retval = 0;
   json_result["cwd"] = std::filesystem::current_path().string();
   json_result["annotation_options"] = aopts_to_json(aopts);
+  json_result["file_options"] = fopts_to_json(fopts);
 
   try {
     std::string assembly;
@@ -181,19 +189,26 @@ int main(int argc, char* argv[]) {
           using T = std::decay_t<decltype(w)>;
           if constexpr (std::is_same_v<T, simple_input>) {
             assembly = w.assembly;
-            json_result["assembly_file"] = w.from_stdin?"<stdin>":fopts.asm_file_name->c_str();
+            json_result.erase("file_options");  // it would be confusing
+            json_result["assembly_file"] =
+                w.from_stdin ? "<stdin>" : fopts.asm_file_name->c_str();
           } else {
             assembly = w.assembly;
-            json_result["file_options"] = fopts_to_json(fopts);
             json_result["compiler_invocation"] = meta_to_json(w.invocation);
           }
         },
         grab_input(fopts));
     auto res = annotate_to_json(assembly, aopts);
     json_result.insert(res.begin(), res.end());
+  } catch (blot::compilation_error& e) {
+    json_result["compiler_invocation"] = meta_to_json(e.invocation);
+    json_result["error"] = error_to_json(e);
+    auto& desc = json_result["error"].as_object();
+    xpto::linespan ls{e.dribble};
+    desc["dribble"] = json::array(ls.begin(), ls.end());
+    retval = -1;
   } catch (std::exception& e) {
-    json_result["error"] = blot::utils::demangle_symbol(typeid(e).name());
-    json_result["details"] = e.what();
+    json_result["error"] = error_to_json(e);
     retval = -1;
   }
   std::cout << json::serialize(json_result) << "\n";
