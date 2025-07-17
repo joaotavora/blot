@@ -2,8 +2,8 @@
   "version": 3,
   "configurePresets": [
     {
-      "name": "debug",
-      "displayName": "Debug Build",
+      "name": "dev",
+      "displayName": "Development Build",
       "binaryDir": "${sourceDir}/build-Debug",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Debug"
@@ -16,13 +16,30 @@
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release"
       }
+    },
+    {
+      "name": "conan-dev",
+      "displayName": "Conan Development Build",
+      "inherits": "dev",
+      "cacheVariables": {
+        "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/conan/conan_toolchain.cmake",
+        "CMAKE_MAP_IMPORTED_CONFIG_DEBUG": "RelWithDebInfo;Release;Debug;"
+      }
+    },
+    {
+      "name": "conan-release",
+      "displayName": "Conan Release Build",
+      "inherits": "release",
+      "cacheVariables": {
+        "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/conan/conan_toolchain.cmake"
+      }
     }
   ],
   "buildPresets": [
     {
-      "name": "debug",
-      "displayName": "Build Debug",
-      "configurePreset": "debug"
+      "name": "dev",
+      "displayName": "Build Development",
+      "configurePreset": "dev"
     },
     {
       "name": "release",
@@ -30,15 +47,25 @@
       "configurePreset": "release"
     },
     {
+      "name": "conan-dev",
+      "displayName": "Build Conan Development",
+      "configurePreset": "conan-dev"
+    },
+    {
+      "name": "conan-release",
+      "displayName": "Build Conan Release",
+      "configurePreset": "conan-release"
+    },
+    {
       "name": "format",
       "displayName": "Format Code",
-      "configurePreset": "debug",
+      "configurePreset": "dev",
       "targets": ["format"]
     },
     {
       "name": "regenerate-fixtures",
       "displayName": "Regenerate Fixtures",
-      "configurePreset": "debug",
+      "configurePreset": "dev",
       "targets": ["regenerate-fixtures"]
     }
   ],
@@ -46,7 +73,7 @@
     {
       "name": "default",
       "displayName": "Run All Tests",
-      "configurePreset": "debug",
+      "configurePreset": "dev",
       "output": {
         "outputOnFailure": true
       },

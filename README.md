@@ -23,9 +23,9 @@ For now, you'll have to build it yourself with a somewhat modern C++
 toolchain.
 
 ```bash
-# Configure and build debug version
-cmake --preset=debug
-cmake --build --preset=debug
+# Configure and build development version
+cmake --preset=dev
+cmake --build --preset=dev
 
 # Or configure and build release version
 cmake --preset=release
@@ -47,6 +47,38 @@ The `blot` program will live in `build-Debug/blot` or
 There are dependencies (nothing exotic: `RE2` for regexps, `Boost` for
 JSON and Process.V2, `fmtlib` for formatting, `CLI11` for CLI
 handling, `libclang` for C++/C parsing, `doctest` for tests)
+
+### Building with Conan
+
+If you have Conan 2 installed, you can automatically download and
+build the dependencies (except `libclang` which must be installed
+separately, for now):
+
+1. Install dependencies
+
+   This will download stuff, and -- if you're lucky -- not compile
+   very much since a package will be found.  Notice how "Release"
+   configuration of the dependencies are being sought after.  In
+   general this is what you want (unless you plan to debug the
+   dependencies themselves).
+   
+   ```bash
+   conan install . --build=missing -s build_type=Release
+   ```
+   
+2. For a Conan-enabled **development** build of Blot
+
+   ```bash
+   cmake --preset=conan-dev
+   cmake --build --preset=conan-dev
+   ```
+   
+3. For a Conan-enabled **release** build of Blot
+
+   ```bash
+   cmake --preset=conan-release
+   cmake --build --preset=conan-release
+   ```
 
 ## Usage
 
@@ -90,16 +122,20 @@ Add `--demangle` for demangled output (this should probably be on by default)
 * *90%* Test coverage
 
   Achieve some kind of parity with Compiler Explorer filtering options
-  (filter directives, library functions, etc).
+  (filter directives, library functions, etc).  The final 10% is I
+  need to go over the Compiler Explorer options one by one to check if
+  it really makes sense.
   
-* *90%* Auto-demangling support using `cxxabi.h`
+* *100%* Auto-demangling support using `cxxabi.h`
   
   Other ABI's not in the roadmap for now.
 
-* *80%* Compilation error handling
+* *95%* Compilation error handling
 
-  Decide where and how to display errors when file can't be compiled
-  or `compile_commands.json` is wrong.
+  Errors are decently reported and serialized in the JSON.  Just
+  wondering if I should also parse some of the error messages for
+  richer line/column info.  I'm leaning no, it's not really blot's job
+  as a tool.
 
 * *30%* Header file annotation
 
@@ -126,8 +162,14 @@ Add `--demangle` for demangled output (this should probably be on by default)
 * *0%* Decent-ish C/C++ stable API and ABI.  The so-called
   "hourglass" pattern might come handy
   
+* *90%* Package management
+ 
+  Conan 2 support implemented for most dependencies.
+  
 * *0%* Documentation
 
 * 0% CI system, code coverage
+
+
 
 

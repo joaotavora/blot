@@ -1,20 +1,18 @@
 cmake_minimum_required(VERSION 3.30)
 project(blot LANGUAGES CXX C)
+
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(CMAKE_CXX_STANDARD 23)
 
-find_package(PkgConfig REQUIRED)
-pkg_check_modules(RE2 REQUIRED re2) # RE2 has no cmake files
-if(RE2_FOUND)
-  add_library(re2::re2 INTERFACE IMPORTED)
-  set_target_properties(re2::re2 PROPERTIES
-    INTERFACE_COMPILE_OPTIONS "${RE2_CFLAGS}"
-    INTERFACE_LINK_LIBRARIES "${RE2_LDFLAGS}"
-  )
+# Try modern CMake first (works with Conan), fallback to PkgConfig
+find_package(re2 QUIET)
+if(NOT re2_FOUND)
+    find_package(PkgConfig REQUIRED)
+    pkg_check_modules(re2 REQUIRED IMPORTED_TARGET re2)
+    add_library(re2::re2 ALIAS PkgConfig::re2)
 endif()
-
 find_package(Boost REQUIRED COMPONENTS process json)
-find_package(Fmt REQUIRED)
+find_package(fmt REQUIRED)
 find_package(CLI11 REQUIRED)
 find_package(doctest REQUIRED)
 find_package(Clang REQUIRED)
