@@ -1,0 +1,30 @@
+#!/bin/bash
+# Check clang-format compliance
+#
+# Install with: cp .githooks/commit-msg .git/hooks/commit-msg && chmod +x .git/hooks/commit-msg
+#
+# Path to clang-format-diff.py (configurable via environment variable)
+CLANG_FORMAT_DIFF="${CLANG_FORMAT_DIFF:-/usr/share/clang/clang-format-diff.py}"
+if [ ! -f "$CLANG_FORMAT_DIFF" ]; then
+    echo "Whoops: clang-format-diff.py not found at $CLANG_FORMAT_DIFF"
+    echo "You should install clang-format or set CLANG_FORMAT_DIFF environment variable"
+    echo "Example: export CLANG_FORMAT_DIFF=/usr/share/clang/clang-format-diff.py"
+    exit 0
+fi
+
+# Run clang-format-diff.py on staged changes
+FORMATTING_DIFF=$(git diff --cached -U0 --no-color | python3 "$CLANG_FORMAT_DIFF" -p1)
+
+if [ -n "$FORMATTING_DIFF" ]; then
+    COMMIT_MSG=$(cat "$1")
+    if [[ "$COMMIT_MSG" =~ (fixup|squash|sudo) ]]; then
+        echo "⚠️  formatting issues:"
+        echo "$FORMATTING_DIFF"
+        exit 0
+    else
+        echo "❌formatting issues:"
+        echo "$FORMATTING_DIFF"
+        exit 1
+    fi
+fi
+exit 0
