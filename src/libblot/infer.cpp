@@ -5,7 +5,10 @@
 
 #include <boost/json.hpp>
 #include <fstream>
+#include <iomanip>
+#include <sstream>
 #include <string>
+#include <vector>
 
 #include "auto.hpp"
 #include "logger.hpp"
@@ -14,6 +17,39 @@
 namespace xpto::blot {
 
 namespace fs = std::filesystem;
+
+// Helper function to create a translation unit from a file and its compile
+// command
+CXTranslationUnit create_translation_unit(
+    CXIndex index, const fs::path& file_path, const std::string& command) {
+  std::vector<std::string> args;
+  std::vector<const char*> argv;
+  std::istringstream iss(command);
+  std::string token;
+
+  // Skip the compiler executable name
+  iss >> token;
+
+  // Collect arguments until we hit compilation output flags
+  // FIXME: In theory, include directories can come after -c and -o flags,
+  // but libclang doesn't seem to handle this correctly. We may need to parse
+  // the entire command and reorder arguments appropriately in the future.
+  while (iss >> token) {
+    if (token == "-o" || token == "-c") {
+      break;
+    }
+    args.push_back(token);
+  }
+
+  argv.reserve(args.size());
+  for (const auto& arg : args) {
+    argv.push_back(arg.data());
+  }
+
+  return clang_parseTranslationUnit(
+      index, file_path.c_str(), argv.data(), static_cast<int>(argv.size()),
+      nullptr, 0, CXTranslationUnit_None);
+}
 
 std::optional<fs::path> infer(
     const fs::path& compile_commands_path, const fs::path& header_file) {
@@ -41,6 +77,7 @@ std::optional<fs::path> infer(
   struct context_s {
     const fs::path* includee{};
     const fs::path* includer{};
+    bool match{};
   } context{&header_file};
 
   // Process each .cpp file
@@ -51,37 +88,35 @@ std::optional<fs::path> infer(
     fs::path full = dir / file;
     context.includer = &full;
 
-    CXTranslationUnit unit = clang_parseTranslationUnit(
-        index, full.c_str(), nullptr, 0, nullptr, 0, CXTranslationUnit_None);
+    // Parse command arguments and create translation unit
+    std::string command = obj["command"].as_string().c_str();
+    CXTranslationUnit unit = create_translation_unit(index, full, command);
     AUTO(clang_disposeTranslationUnit(unit));
 
     if (!unit) continue;  // what is this? failure to parse? ¯\_(ツ)_/¯
+    LOG_DEBUG("OK: Examining '{}'", full);
+    clang_getInclusions(
+        unit,
+        [](CXFile included_file, CXSourceLocation* inclusion_stack,
+           unsigned include_len, CXClientData cookie) {
+          auto* context = static_cast<context_s*>(cookie);
 
-    // Get the number of inclusions
-    try {
-      clang_getInclusions(
-          unit,
-          [](CXFile included_file, CXSourceLocation* inclusion_stack,
-             unsigned include_len, CXClientData cookie) {
-            auto* context = static_cast<context_s*>(cookie);
+          CXString filename = clang_getFileName(included_file);
+          AUTO(clang_disposeString(filename));
+          fs::path includee = clang_getCString(filename);
+          LOG_DEBUG("   OK: Saw this includee '{}'", includee);
 
-            CXString filename = clang_getFileName(included_file);
-            AUTO(clang_disposeString(filename));
-            fs::path includee = clang_getCString(filename);
-
-            // Check if this inclusion matches our target header
-            if (includee == *context->includee ||
-                includee.filename() == context->includee->filename()) {
-              LOG_INFO(
-                  "SUCCESS: Found includer of '{}' in translation unit '{}'",
-                  *context->includee, *context->includer);
-              throw context->includer;
-            }
-          },
-          &context);  // NOLINT
-    } catch (const fs::path* found) {
-      return *found;
-    }
+          // Check if this inclusion matches our target header
+          if (includee == *context->includee ||
+              includee.filename() == context->includee->filename()) {
+            LOG_INFO(
+                "SUCCESS: Found includer of '{}' in translation unit '{}'",
+                *context->includee, *context->includer);
+            context->match = true;
+          }
+        },
+        &context);
+    if (context.match) return *context.includer;
   }
   return std::nullopt;
 }
