@@ -50,7 +50,7 @@ endif()
 configure_file(test/test_config.h.in test/test_config.h)
 
 # Doctest runner
-add_executable(test_blot test/main.cpp test/annotation_tests.cpp test/infer_tests.cpp)
+add_executable(test_blot test/main.cpp test/annotation-tests.cpp test/infer-tests.cpp)
 target_include_directories(test_blot PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/test)
 target_link_libraries(test_blot PRIVATE
   blot_lib
@@ -64,7 +64,7 @@ include(doctest)
 doctest_discover_tests(test_blot)
 
 # Add system tests for blot executable
-include(test/system_tests.cmake)
+include(test/system-tests.cmake)
 
 # Utility targets
 include(cmake/utils.cmake)

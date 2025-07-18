@@ -87,64 +87,64 @@ TestFixture fixture;
 
 TEST_CASE("api_gcc_basic") {
   fixture.test_annotation_against_expectation(
-      "fxt_gcc_basic.cpp", "fxt_gcc_basic.json", fixture.ccj_path);
+      "fxt-gcc-basic.cpp", "fxt-gcc-basic.json", fixture.ccj_path);
 }
 
 TEST_CASE("api_gcc_still_pretty_basic") {
   fixture.test_annotation_against_expectation(
-      "fxt_gcc_still_pretty_basic.cpp", "fxt_gcc_still_pretty_basic.json",
+      "fxt-gcc-still-pretty-basic.cpp", "fxt-gcc-still-pretty-basic.json",
       fixture.ccj_path);
 }
 
 TEST_CASE("api_gcc_demangle") {
   fixture.test_annotation_against_expectation(
-      "fxt_gcc_demangle.cpp", "fxt_gcc_demangle.json", fixture.ccj_path,
+      "fxt-gcc-demangle.cpp", "fxt-gcc-demangle.json", fixture.ccj_path,
       {.demangle = true});
 }
 
 TEST_CASE("api_gcc_preserve_directives") {
   fixture.test_annotation_against_expectation(
-      "fxt_gcc_preserve_directives.cpp", "fxt_gcc_preserve_directives.json",
+      "fxt-gcc-preserve-directives.cpp", "fxt-gcc-preserve-directives.json",
       fixture.ccj_path,
       {.preserve_directives = true, .preserve_comments = true});
 }
 
 TEST_CASE("api_gcc_preserve_library_functions") {
   fixture.test_annotation_against_expectation(
-      "fxt_gcc_preserve_library_functions.cpp",
-      "fxt_gcc_preserve_library_functions.json", fixture.ccj_path,
+      "fxt-gcc-preserve-library-functions.cpp",
+      "fxt-gcc-preserve-library-functions.json", fixture.ccj_path,
       {.preserve_library_functions = true});
 }
 
 TEST_CASE("api_gcc_no_preserve_library_functions") {
   fixture.test_annotation_against_expectation(
-      "fxt_gcc_preserve_library_functions.cpp",
-      "fxt_gcc_no_preserve_library_functions.json", fixture.ccj_path,
+      "fxt-gcc-preserve-library-functions.cpp",
+      "fxt-gcc-no-preserve-library-functions.json", fixture.ccj_path,
       {.preserve_library_functions = false});
 }
 
 TEST_CASE("api_gcc_minimal") {
   fixture.test_annotation_against_expectation(
-      "fxt_gcc_minimal.cpp", "fxt_gcc_minimal.json", fixture.ccj_path);
+      "fxt-gcc-minimal.cpp", "fxt-gcc-minimal.json", fixture.ccj_path);
 }
 
 TEST_CASE("api_clang_preserve_library_functions") {
   fixture.test_annotation_against_expectation(
-      "fxt_clang_preserve_library_functions.cpp",
-      "fxt_clang_preserve_library_functions.json", fixture.ccj_path,
+      "fxt-clang-preserve-library-functions.cpp",
+      "fxt-clang-preserve-library-functions.json", fixture.ccj_path,
       {.preserve_library_functions = true});
 }
 
 TEST_CASE("api_clang_demangle") {
   fixture.test_annotation_against_expectation(
-      "fxt_clang_demangle.cpp", "fxt_clang_demangle.json", fixture.ccj_path,
+      "fxt-clang-demangle.cpp", "fxt-clang-demangle.json", fixture.ccj_path,
       {.demangle = true});
 }
 
 TEST_CASE("api_gcc_errors") {
   // This test verifies that compilation errors are properly handled
   auto cmd =
-      xpto::blot::find_compile_command(fixture.ccj_path, "fxt_gcc_errors.cpp");
+      xpto::blot::find_compile_command(fixture.ccj_path, "fxt-gcc-errors.cpp");
   REQUIRE(cmd.has_value());
 
   // The get_asm function should throw when compilation fails

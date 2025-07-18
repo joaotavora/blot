@@ -102,7 +102,7 @@ The project has a comprehensive (ahem...) test suite with distinct
 test families.  The C++ API tests use the `doctest` framework, the
 others with Cmake and some sh scripts.
 
-#### End-to-end API Tests (`test/annotation_tests.cpp`)
+#### End-to-end API Tests (`test/annotation-tests.cpp`)
 
 - Naming: Prefixed with `api_` (e.g., `api_basic`, `api_demangle`)
 
@@ -114,21 +114,21 @@ others with Cmake and some sh scripts.
   results against expected JSON.  Come to think of this these are
   `api` "integration" tests, but
 
-#### Inference API Tests (`test/infer_tests.cpp`)
+#### Inference API Tests (`test/infer-tests.cpp`)
 
-- Naming: prefix with `api_infer_`.
+- Naming: prefix with `api-infer-`.
 
 - Purpose: test just the includer-inferring part
 
-#### CLI Tests (`test/system_tests.cmake`)
+#### CLI Tests (`test/system-tests.cmake`)
 
-- Naming: Prefixed with `cli_` (e.g., `cli_basic_json`)
+- Naming: Prefixed with `cli-` (e.g., `cli-basic-json`)
 
 - Purpose: Test the blot executable's command-line interface
 
 - Approach: Run the blot executable and compare full JSON output
 
-- Implementation: Uses custom script `test/blot_and_compare.sh` for
+- Implementation: Uses custom script `test/blot-and-compare.sh` for
   JSON comparison
 
 ### Test Fixtures (`test/fixture/`)
@@ -140,17 +140,17 @@ whose only purpose is to help check Blot.  There is a
 Note that both API (C++) and CLI tests use the same fixture files.
 
 Files here:
-- `fxt_*.{cpp,hpp,h}` - C++ fixture source files for testing 
-- `fxt_*.json` - Expected fixture JSON output for comparison
+- `fxt-*.{cpp,hpp,h}` - C++ fixture source files for testing
+- `fxt-*.json` - Expected fixture JSON output for comparison
 - `compile_commands.json` - Compile commands for fixture files
 
-The `fxt_*.json` files are generated with sth like:
+The `fxt-*.json` files are generated with sth like:
 
-```blot --ccj test/fixture/compile_commands.json test/fixture/fxt_clang_preserve_library_functions.cpp -pl --json | jq``` 
+```blot --ccj test/fixture/compile_commands.json test/fixture/fxt-clang-preserve-library-functions.cpp -pl --json | jq```
 
 Where `-pl` was added there because this particular feature is
 specifically about testing the "preserve library functions"
-functionality.  
+functionality.
 
 ### Challenges
 
@@ -192,7 +192,7 @@ implementation are encapsulated in `src/libblot/`.
 
 While the project is still young and in flux, this may change.  So
 just look at one of the fixture files like
-`test/fixture/preserve_directives.json`
+`test/fixture/fxt-clang-demangle.cpp`.
 
 ### Major Future Challenges
 

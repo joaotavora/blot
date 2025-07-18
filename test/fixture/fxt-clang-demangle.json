@@ -1,0 +1,46 @@
+{
+  "annotation_options": {
+    "demangle": true,
+    "preserve_directives": false,
+    "preserve_library_functions": false,
+    "preserve_comments": false,
+    "preserve_unused_labels": false
+  },
+  "file_options": {
+    "compile_commands_path": "test/fixture/compile_commands.json",
+    "source_file": "test/fixture/fxt-clang-demangle.cpp"
+  },
+  "compiler_invocation": {
+    "compiler_version": "20.1.8",
+    "compiler": "/usr/bin/clang++",
+    "args": [
+      "-std=c++23",
+      "-g",
+      "-O2",
+      "-S",
+      "fxt-clang-demangle.cpp",
+      "-g1",
+      "-o",
+      "-"
+    ]
+  },
+  "assembly": [
+    "math::complex_function():           # @math::complex_function()",
+    "\tretq",
+    "main:                                   # @main",
+    "\tmovl\t$8, %eax",
+    "\tretq"
+  ],
+  "line_mappings": [
+    {
+      "source_line": 15,
+      "asm_start": 2,
+      "asm_end": 2
+    },
+    {
+      "source_line": 23,
+      "asm_start": 4,
+      "asm_end": 5
+    }
+  ]
+}

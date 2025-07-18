@@ -1,62 +1,62 @@
 [
 {
   "directory": ".",
-  "command": "/usr/bin/c++ -std=c++23 -g -O2 -o fxt_gcc_basic.o -c fxt_gcc_basic.cpp",
-  "file": "fxt_gcc_basic.cpp",
-  "output": "fxt_gcc_basic.o"
+  "command": "/usr/bin/c++ -std=c++23 -g -O2 -o fxt-gcc-basic.o -c fxt-gcc-basic.cpp",
+  "file": "fxt-gcc-basic.cpp",
+  "output": "fxt-gcc-basic.o"
 },
 {
   "directory": ".",
-  "command": "/usr/bin/c++ -std=c++23 -g -O2 -o fxt_gcc_still_pretty_basic.o -c fxt_gcc_still_pretty_basic.cpp",
-  "file": "fxt_gcc_still_pretty_basic.cpp",
-  "output": "fxt_gcc_still_pretty_basic.o"
+  "command": "/usr/bin/c++ -std=c++23 -g -O2 -o fxt-gcc-still-pretty-basic.o -c fxt-gcc-still-pretty-basic.cpp",
+  "file": "fxt-gcc-still-pretty-basic.cpp",
+  "output": "fxt-gcc-still-pretty-basic.o"
 },
 {
   "directory": ".",
-  "command": "/usr/bin/c++ -std=c++23 -g -O2 -o fxt_gcc_demangle.o -c fxt_gcc_demangle.cpp",
-  "file": "fxt_gcc_demangle.cpp",
-  "output": "fxt_gcc_demangle.o"
+  "command": "/usr/bin/c++ -std=c++23 -g -O2 -o fxt-gcc-demangle.o -c fxt-gcc-demangle.cpp",
+  "file": "fxt-gcc-demangle.cpp",
+  "output": "fxt-gcc-demangle.o"
 },
 {
   "directory": ".",
-  "command": "/usr/bin/c++ -std=c++23 -g -O2 -o fxt_gcc_preserve_directives.o -c fxt_gcc_preserve_directives.cpp",
-  "file": "fxt_gcc_preserve_directives.cpp",
-  "output": "fxt_gcc_preserve_directives.o"
+  "command": "/usr/bin/c++ -std=c++23 -g -O2 -o fxt-gcc-preserve-directives.o -c fxt-gcc-preserve-directives.cpp",
+  "file": "fxt-gcc-preserve-directives.cpp",
+  "output": "fxt-gcc-preserve-directives.o"
 },
 {
   "directory": ".",
-  "command": "/usr/bin/c++ -std=c++23 -g -O0 -o fxt_gcc_preserve_library_functions.o -c fxt_gcc_preserve_library_functions.cpp",
-  "file": "fxt_gcc_preserve_library_functions.cpp",
-  "output": "fxt_gcc_preserve_library_functions.o"
+  "command": "/usr/bin/c++ -std=c++23 -g -O0 -o fxt-gcc-preserve-library-functions.o -c fxt-gcc-preserve-library-functions.cpp",
+  "file": "fxt-gcc-preserve-library-functions.cpp",
+  "output": "fxt-gcc-preserve-library-functions.o"
 },
 {
   "directory": ".",
-  "command": "/usr/bin/c++ -std=c++23 -g -O2 -o fxt_gcc_minimal.o -c fxt_gcc_minimal.cpp",
-  "file": "fxt_gcc_minimal.cpp",
-  "output": "fxt_gcc_minimal.o"
+  "command": "/usr/bin/c++ -std=c++23 -g -O2 -o fxt-gcc-minimal.o -c fxt-gcc-minimal.cpp",
+  "file": "fxt-gcc-minimal.cpp",
+  "output": "fxt-gcc-minimal.o"
 },
 {
   "directory": ".",
-  "command": "/usr/bin/clang++ -std=c++23 -g -O0 -o fxt_clang_preserve_library_functions.o -c fxt_clang_preserve_library_functions.cpp",
-  "file": "fxt_clang_preserve_library_functions.cpp",
-  "output": "fxt_clang_preserve_library_functions.o"
+  "command": "/usr/bin/clang++ -std=c++23 -g -O0 -o fxt-clang-preserve-library-functions.o -c fxt-clang-preserve-library-functions.cpp",
+  "file": "fxt-clang-preserve-library-functions.cpp",
+  "output": "fxt-clang-preserve-library-functions.o"
 },
 {
   "directory": ".",
-  "command": "/usr/bin/clang++ -std=c++23 -g -O2 -o fxt_clang_demangle.o -c fxt_clang_demangle.cpp",
-  "file": "fxt_clang_demangle.cpp",
-  "output": "fxt_clang_demangle.o"
+  "command": "/usr/bin/clang++ -std=c++23 -g -O2 -o fxt-clang-demangle.o -c fxt-clang-demangle.cpp",
+  "file": "fxt-clang-demangle.cpp",
+  "output": "fxt-clang-demangle.o"
 },
 {
   "directory": ".",
-  "command": "/usr/bin/c++ -std=c++23 -g -O2 -o fxt_gcc_errors.o -c fxt_gcc_errors.cpp",
-  "file": "fxt_gcc_errors.cpp",
-  "output": "fxt_gcc_errors.o"
+  "command": "/usr/bin/c++ -std=c++23 -g -O2 -o fxt-gcc-errors.o -c fxt-gcc-errors.cpp",
+  "file": "fxt-gcc-errors.cpp",
+  "output": "fxt-gcc-errors.o"
 },
 {
   "directory": ".",
-  "command": "/usr/bin/c++ -std=c++23 -g -O2 -o fxt_gcc_includes.o -c fxt_gcc_includes.cpp",
-  "file": "fxt_gcc_includes.cpp",
-  "output": "fxt_gcc_includes.o"
+  "command": "/usr/bin/c++ -std=c++23 -g -O2 -o fxt-gcc-includes.o -c fxt-gcc-includes.cpp",
+  "file": "fxt-gcc-includes.cpp",
+  "output": "fxt-gcc-includes.o"
 }
 ]
