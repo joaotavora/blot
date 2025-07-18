@@ -1,0 +1,17 @@
+[requires]
+boost/1.88.0
+fmt/11.2.0
+cli11/2.5.0
+re2/20240702
+doctest/2.4.11
+
+[tool_requires]
+cmake/[>=3.30]
+
+[generators]
+CMakeDeps
+VirtualRunEnv
+
+[options]
+
+[imports]

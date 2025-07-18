@@ -11,7 +11,7 @@
     },
     {
       "name": "release",
-      "displayName": "Release Build", 
+      "displayName": "Release Build",
       "binaryDir": "${sourceDir}/build-Release",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release"
@@ -22,7 +22,9 @@
       "displayName": "Conan Development Build",
       "inherits": "dev",
       "cacheVariables": {
-        "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/conan/conan_toolchain.cmake",
+        "CMAKE_PROJECT_TOP_LEVEL_INCLUDES": "${sourceDir}/cmake/conan_provider.cmake",
+        "CONAN_HOST_PROFILE": "${sourceDir}/cmake/conan-profile",
+        "CONAN_INSTALL_ARGS": "--build=missing --settings build_type=Debug",
         "CMAKE_MAP_IMPORTED_CONFIG_DEBUG": "RelWithDebInfo;Release;Debug;"
       }
     },
@@ -31,7 +33,9 @@
       "displayName": "Conan Release Build",
       "inherits": "release",
       "cacheVariables": {
-        "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/conan/conan_toolchain.cmake"
+        "CMAKE_PROJECT_TOP_LEVEL_INCLUDES": "${sourceDir}/cmake/conan_provider.cmake",
+        "CONAN_HOST_PROFILE": "${sourceDir}/cmake/conan-profile",
+        "CONAN_INSTALL_ARGS": "--build=missing --settings build_type=Release"
       }
     }
   ],
