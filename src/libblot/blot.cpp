@@ -395,7 +395,7 @@ std::vector<std::string> apply_demanglings(const annotation_result& result) {
 
       // Check if mangled_sv is within this line
       if (mangled_sv.data() >= line.data() &&
-        mangled_sv.data() + mangled_sv.size() <= line.data() + line.size()) {
+          mangled_sv.data() + mangled_sv.size() <= line.data() + line.size()) {
         line_demanglings.emplace_back(mangled_sv, demangled);
         ++demangling_it;
       } else {
@@ -410,7 +410,7 @@ std::vector<std::string> apply_demanglings(const annotation_result& result) {
       // shifts
       std::string demangled_line{line};
       for (auto it = line_demanglings.rbegin(); it != line_demanglings.rend();
-                                                ++it) {
+           ++it) {
         const auto& [mangled_sv, demangled] = *it;
 
         // Find position of mangled symbol in current demangled_line
