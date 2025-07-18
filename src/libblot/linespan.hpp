@@ -85,7 +85,8 @@ struct linespan {
     return iterator(end_ptr, end_ptr);
   }
 
-  auto data(this auto&& self) { return self->data_; }
+  const std::span<const char>& data() const { return data_; }
+  std::span<const char>& data() { return data_; }
 
  private:
   std::span<const char> data_;
