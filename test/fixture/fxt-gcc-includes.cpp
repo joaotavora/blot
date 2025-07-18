@@ -1,3 +1,3 @@
 #include "fxt-gcc-includes.hpp"
 
-int main(){};
+int main() { return fooey(); }
