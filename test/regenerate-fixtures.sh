@@ -12,7 +12,7 @@ fi
 BLOT="$1"
 FIXTURE_DIR="$2"
 
-for json_path in "$FIXTURE_DIR"/fxt_*.json; do
+for json_path in "$FIXTURE_DIR"/fxt-*.json; do
   json_file=$(basename "$json_path")
   
   # Read source file and compile_commands.json from JSON file_options

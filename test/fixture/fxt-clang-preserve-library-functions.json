@@ -8,49 +8,49 @@
   },
   "file_options": {
     "compile_commands_path": "test/fixture/compile_commands.json",
-    "source_file": "test/fixture/fxt_gcc_preserve_library_functions.cpp"
+    "source_file": "test/fixture/fxt-clang-preserve-library-functions.cpp"
   },
   "compiler_invocation": {
-    "compiler_version": "15.1.1",
-    "compiler": "/usr/bin/c++",
+    "compiler_version": "20.1.8",
+    "compiler": "/usr/bin/clang++",
     "args": [
       "-std=c++23",
       "-g",
       "-O0",
       "-S",
-      "fxt_gcc_preserve_library_functions.cpp",
+      "fxt-clang-preserve-library-functions.cpp",
       "-g1",
       "-o",
       "-"
     ]
   },
   "assembly": [
-    "_Z3fooRKSt6vectorIiSaIiEE:",
+    "_Z3fooRKSt6vectorIiSaIiEE:              # @_Z3fooRKSt6vectorIiSaIiEE",
     "\tpushq\t%rbp",
     "\tmovq\t%rsp, %rbp",
     "\tsubq\t$16, %rsp",
     "\tmovq\t%rdi, -8(%rbp)",
-    "\tmovq\t-8(%rbp), %rax",
-    "\tmovq\t%rax, %rdi",
-    "\tcall\t_ZNKSt6vectorIiSaIiEE4sizeEv",
-    "\tleave",
-    "\tret",
-    "_ZNKSt6vectorIiSaIiEE4sizeEv:",
+    "\tmovq\t-8(%rbp), %rdi",
+    "\tcallq\t_ZNKSt6vectorIiSaIiEE4sizeEv",
+    "\taddq\t$16, %rsp",
+    "\tpopq\t%rbp",
+    "\tretq",
+    "_ZNKSt6vectorIiSaIiEE4sizeEv:           # @_ZNKSt6vectorIiSaIiEE4sizeEv",
     "\tpushq\t%rbp",
     "\tmovq\t%rsp, %rbp",
-    "\tmovq\t%rdi, -24(%rbp)",
-    "\tmovq\t-24(%rbp), %rax",
-    "\tmovq\t8(%rax), %rdx",
-    "\tmovq\t-24(%rbp), %rax",
-    "\tmovq\t(%rax), %rax",
-    "\tsubq\t%rax, %rdx",
-    "\tmovq\t%rdx, %rax",
+    "\tmovq\t%rdi, -8(%rbp)",
+    "\tmovq\t-8(%rbp), %rcx",
+    "\tmovq\t8(%rcx), %rax",
+    "\tmovq\t(%rcx), %rcx",
+    "\tsubq\t%rcx, %rax",
     "\tsarq\t$2, %rax",
-    "\tmovq\t%rax, -8(%rbp)",
-    "\tcmpq\t$0, -8(%rbp)",
-    "\tmovq\t-8(%rbp), %rax",
+    "\tmovq\t%rax, -16(%rbp)",
+    "\tcmpq\t$0, -16(%rbp)",
+    "\tjge\t.LBB1_2",
+    ".LBB1_2:",
+    "\tmovq\t-16(%rbp), %rax",
     "\tpopq\t%rbp",
-    "\tret"
+    "\tretq"
   ],
   "line_mappings": [
     {
@@ -61,11 +61,6 @@
     {
       "source_line": 5,
       "asm_start": 6,
-      "asm_end": 8
-    },
-    {
-      "source_line": 6,
-      "asm_start": 9,
       "asm_end": 10
     }
   ]

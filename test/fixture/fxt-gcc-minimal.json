@@ -1,6 +1,6 @@
 {
   "annotation_options": {
-    "demangle": true,
+    "demangle": false,
     "preserve_directives": false,
     "preserve_library_functions": false,
     "preserve_comments": false,
@@ -8,7 +8,7 @@
   },
   "file_options": {
     "compile_commands_path": "test/fixture/compile_commands.json",
-    "source_file": "test/fixture/fxt_gcc_demangle.cpp"
+    "source_file": "test/fixture/fxt-gcc-minimal.cpp"
   },
   "compiler_invocation": {
     "compiler_version": "15.1.1",
@@ -18,29 +18,22 @@
       "-g",
       "-O2",
       "-S",
-      "fxt_gcc_demangle.cpp",
+      "fxt-gcc-minimal.cpp",
       "-g1",
       "-o",
       "-"
     ]
   },
   "assembly": [
-    "math::complex_function():",
-    "\tret",
     "main:",
-    "\tmovl\t$8, %eax",
+    "\txorl\t%eax, %eax",
     "\tret"
   ],
   "line_mappings": [
     {
-      "source_line": 15,
+      "source_line": 2,
       "asm_start": 2,
-      "asm_end": 2
-    },
-    {
-      "source_line": 24,
-      "asm_start": 4,
-      "asm_end": 5
+      "asm_end": 3
     }
   ]
 }

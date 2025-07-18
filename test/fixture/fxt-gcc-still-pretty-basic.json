@@ -8,7 +8,7 @@
   },
   "file_options": {
     "compile_commands_path": "test/fixture/compile_commands.json",
-    "source_file": "test/fixture/fxt_gcc_still_pretty_basic.cpp"
+    "source_file": "test/fixture/fxt-gcc-still-pretty-basic.cpp"
   },
   "compiler_invocation": {
     "compiler_version": "15.1.1",
@@ -18,7 +18,7 @@
       "-g",
       "-O2",
       "-S",
-      "fxt_gcc_still_pretty_basic.cpp",
+      "fxt-gcc-still-pretty-basic.cpp",
       "-g1",
       "-o",
       "-"
