@@ -23,7 +23,7 @@
       "inherits": "dev",
       "cacheVariables": {
         "CMAKE_PROJECT_TOP_LEVEL_INCLUDES": "${sourceDir}/cmake/conan_provider.cmake",
-        "CONAN_HOST_PROFILE": "${sourceDir}/cmake/conan-profile",
+        "CONAN_HOST_PROFILE": "${sourceDir}/cmake/conan-optimistic-gcc-profile",
         "CONAN_INSTALL_ARGS": "--build=missing --settings build_type=Debug",
         "CMAKE_MAP_IMPORTED_CONFIG_DEBUG": "RelWithDebInfo;Release;Debug;"
       }
@@ -34,56 +34,8 @@
       "inherits": "release",
       "cacheVariables": {
         "CMAKE_PROJECT_TOP_LEVEL_INCLUDES": "${sourceDir}/cmake/conan_provider.cmake",
-        "CONAN_HOST_PROFILE": "${sourceDir}/cmake/conan-profile",
+        "CONAN_HOST_PROFILE": "${sourceDir}/cmake/conan-optimistic-gcc-profile",
         "CONAN_INSTALL_ARGS": "--build=missing --settings build_type=Release"
-      }
-    }
-  ],
-  "buildPresets": [
-    {
-      "name": "dev",
-      "displayName": "Build Development",
-      "configurePreset": "dev"
-    },
-    {
-      "name": "release",
-      "displayName": "Build Release",
-      "configurePreset": "release"
-    },
-    {
-      "name": "conan-dev",
-      "displayName": "Build Conan Development",
-      "configurePreset": "conan-dev"
-    },
-    {
-      "name": "conan-release",
-      "displayName": "Build Conan Release",
-      "configurePreset": "conan-release"
-    },
-    {
-      "name": "format",
-      "displayName": "Format Code",
-      "configurePreset": "dev",
-      "targets": ["format"]
-    },
-    {
-      "name": "regenerate-fixtures",
-      "displayName": "Regenerate Fixtures",
-      "configurePreset": "dev",
-      "targets": ["regenerate-fixtures"]
-    }
-  ],
-  "testPresets": [
-    {
-      "name": "default",
-      "displayName": "Run All Tests",
-      "configurePreset": "dev",
-      "output": {
-        "outputOnFailure": true
-      },
-      "execution": {
-        "noTestsAction": "error",
-        "stopOnFailure": false
       }
     }
   ]

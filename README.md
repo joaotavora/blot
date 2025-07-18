@@ -24,21 +24,21 @@ toolchain.
 
 ```bash
 # Configure and build development version
-cmake --preset=dev
-cmake --build --preset=dev
+cmake -B build-Debug -DCMAKE_BUILD_TYPE=Debug # aka cmake --preset=dev
+cmake --build build-Debug
 
 # Or configure and build release version
 cmake --preset=release
-cmake --build --preset=release
+cmake --build build-Release
 
 # Run tests
-ctest --preset=default
+ctest --test-dir build-Debug
 
 # Format code
-cmake --build --preset=format
+cmake --build build-Debug --target=format
 
 # Regenerate test fixture files
-cmake --build --preset=regenerate-fixtures
+cmake --build build-Debug --target=regenerate-fixtures
 ```
 
 The `blot` program will live in `build-Debug/blot` or
@@ -47,38 +47,6 @@ The `blot` program will live in `build-Debug/blot` or
 There are dependencies (nothing exotic: `RE2` for regexps, `Boost` for
 JSON and Process.V2, `fmtlib` for formatting, `CLI11` for CLI
 handling, `libclang` for C++/C parsing, `doctest` for tests)
-
-### Building with Conan
-
-If you have Conan 2 installed, you can automatically download and
-build the dependencies (except `libclang` which must be installed
-separately, for now):
-
-1. Install dependencies
-
-   This will download stuff, and -- if you're lucky -- not compile
-   very much since a package will be found.  Notice how "Release"
-   configuration of the dependencies are being sought after.  In
-   general this is what you want (unless you plan to debug the
-   dependencies themselves).
-   
-   ```bash
-   conan install . --build=missing -s build_type=Release
-   ```
-   
-2. For a Conan-enabled **development** build of Blot
-
-   ```bash
-   cmake --preset=conan-dev
-   cmake --build --preset=conan-dev
-   ```
-   
-3. For a Conan-enabled **release** build of Blot
-
-   ```bash
-   cmake --preset=conan-release
-   cmake --build --preset=conan-release
-   ```
 
 ## Usage
 
@@ -170,6 +138,30 @@ Add `--demangle` for demangled output (this should probably be on by default)
 
 * 0% CI system, code coverage
 
+## Building with Conan (may be useful later for CI)
 
+If you have Conan 2 installed, you can automatically download and
+build the dependencies (except `libclang` which must be installed
+separately, for now).
+
+There are some profiles `conan-dev` and `conan-release` that make use
+of [conan-cmake][1] integration, so no manual `conan install` is
+needed - CMake will automatically invoke Conan during configuration.
+
+1. For a Conan-enabled **development** build of Blot
+
+   ```bash
+   cmake --preset=conan-dev
+   cmake --build build-Debug
+   ```
+   
+2. For a Conan-enabled **release** build of Blot
+
+   ```bash
+   cmake --preset=conan-release
+   cmake --build build-Release
+   ```
+
+[1]: https://github.com/conan-io/cmake-conan/tree/develop2
 
 
