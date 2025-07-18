@@ -4,6 +4,12 @@ project(blot LANGUAGES CXX C)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(CMAKE_CXX_STANDARD 23)
 
+# Enable AddressSanitizer and UBSan in Debug builds
+if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+  add_compile_options(-fsanitize=address,undefined)
+  add_link_options(-fsanitize=address,undefined)
+endif()
+
 # Try modern CMake first (works with Conan), fallback to PkgConfig
 find_package(re2 QUIET)
 if(NOT re2_FOUND)
@@ -40,11 +46,6 @@ target_link_libraries(blot_exe PRIVATE
   CLI11::CLI11
 )
 set_target_properties(blot_exe PROPERTIES OUTPUT_NAME blot)
-
-if(CMAKE_BUILD_TYPE STREQUAL "Debug")
-  target_compile_options(blot_exe PRIVATE "-fsanitize=address,undefined")
-  target_link_options(blot_exe PRIVATE "-fsanitize=address,undefined")
-endif()
 
 # Generate test configuration header
 configure_file(test/test_config.h.in test/test_config.h)
