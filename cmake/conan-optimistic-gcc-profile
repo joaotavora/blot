@@ -1,0 +1,11 @@
+# This profile uses common, stable compiler versions and settings
+# to maximize the likelihood that Conan finds prebuilt binaries
+# instead of building dependencies from source.
+[settings]
+os=Linux
+arch=x86_64
+compiler=gcc
+compiler.version=11
+compiler.libcxx=libstdc++11
+compiler.cppstd=17
+build_type=Release
