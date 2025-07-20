@@ -5,6 +5,8 @@
 #include <string>
 #include <vector>
 
+#include "blot/compile_command.hpp"
+
 namespace xpto::blot {
 
 namespace fs = std::filesystem;
@@ -31,8 +33,6 @@ struct compilation_result {
   compiler_invocation invocation;
 };
 
-compilation_result get_asm(
-    const fs::path& directory, const std::string& command,
-    const fs::path& file);
+compilation_result get_asm(const compile_command& cmd);
 
 }  // namespace xpto::blot

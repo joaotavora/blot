@@ -42,11 +42,9 @@ struct TestFixture {
       const fs::path& compile_commands_file,
       const xpto::blot::annotation_options& aopts = {}) {
     // Generate assembly from compile commands
-    auto cmd =
-        xpto::blot::find_compile_command(compile_commands_file, cpp_file);
+    auto cmd = xpto::blot::infer(compile_commands_file, cpp_file);
     REQUIRE(cmd.has_value());
-    auto c_result =
-        xpto::blot::get_asm(cmd->directory, cmd->command, cmd->file);
+    auto c_result = xpto::blot::get_asm(*cmd);
 
     // Run blot annotation with provided options
     auto a_result = xpto::blot::annotate(c_result.assembly, aopts);
@@ -143,12 +141,9 @@ TEST_CASE("api_clang_demangle") {
 
 TEST_CASE("api_gcc_errors") {
   // This test verifies that compilation errors are properly handled
-  auto cmd =
-      xpto::blot::find_compile_command(fixture.ccj_path, "fxt-gcc-errors.cpp");
+  auto cmd = xpto::blot::infer(fixture.ccj_path, "fxt-gcc-errors.cpp");
   REQUIRE(cmd.has_value());
 
   // The get_asm function should throw when compilation fails
-  CHECK_THROWS_AS(
-      xpto::blot::get_asm(cmd->directory, cmd->command, cmd->file),
-      std::runtime_error);
+  CHECK_THROWS_AS(xpto::blot::get_asm(*cmd), std::runtime_error);
 }

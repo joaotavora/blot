@@ -8,7 +8,6 @@
 #include <boost/system/system_error.hpp>
 #include <filesystem>
 #include <fstream>
-#include <iomanip>
 #include <optional>
 #include <sstream>
 #include <string>
@@ -24,71 +23,16 @@ namespace fs = std::filesystem;
 namespace json = boost::json;
 namespace bs = boost::system;
 
+// Helper function to parse compile_commands.json
+json::array parse_ccj(const fs::path& compile_commands_path) {
+  std::ifstream is{compile_commands_path.string()};
+  if (!is) utils::throwf("Can't parse {}", compile_commands_path);
+  return json::parse(is).as_array();
+}
+
 std::optional<fs::path> find_ccj() {
   auto probe = fs::current_path() / "compile_commands.json";
   if (fs::exists(probe)) return probe;
-  return std::nullopt;
-}
-
-std::optional<compile_command> find_compile_command(
-    const fs::path& compile_commands_path, const fs::path& target_path) {
-  // First, parse the compile_commands.json file as is
-  json::value json_content = [&]() {
-    std::ifstream blob(compile_commands_path.string());
-    if (!blob) {
-      throw std::runtime_error(
-          fmt::format(
-              "Could not open compile_commands.json at {}",
-              compile_commands_path));
-    }
-
-    std::string content(
-        (std::istreambuf_iterator<char>(blob)),
-        std::istreambuf_iterator<char>());
-    auto ret = json::parse(content);
-    if (!ret.is_array()) {
-      throw std::runtime_error(
-          std::format(
-              "Could not open compile_commands.json at {}",
-              compile_commands_path.string()));
-    }
-    return ret;
-  }();
-
-  fs::path ccj_dir = compile_commands_path.parent_path();
-  auto absolute_maybe = [&](const fs::path& p) -> fs::path {
-    if (p.is_absolute()) {
-      return p;
-    } else {
-      auto hmm = ccj_dir / p;
-      return fs::absolute(hmm);
-    }
-  };
-
-  for (const auto& entry : json_content.as_array()) {
-    try {
-      const auto& obj = entry.as_object();
-      auto get = [&](const char* k) { return obj.at(k).as_string().c_str(); };
-
-      fs::path ccj_entry_file = get("file");
-
-      fs::path for_comp = ccj_entry_file.is_absolute()
-                              ? fs::absolute(target_path)
-                              : fs::relative(target_path, ccj_dir);
-
-      if (ccj_entry_file == for_comp)
-        return compile_command{
-          .directory = absolute_maybe(get("directory")),
-          .command = get("command"),
-          .file = absolute_maybe(ccj_entry_file),
-        };
-    } catch (boost::system::system_error& e) {
-      LOG_INFO("Having trouble because {}", e.what());
-    }
-  }
-  LOG_ERROR(
-      "No compilation command found for {} in {}", target_path,
-      compile_commands_path);
   return std::nullopt;
 }
 
@@ -125,54 +69,49 @@ CXTranslationUnit create_translation_unit(
       nullptr, 0, CXTranslationUnit_None);
 }
 
-std::optional<fs::path> infer(
-    const fs::path& compile_commands_path, const fs::path& header_file) {
+std::optional<compile_command> infer(
+    const fs::path& compile_commands_path, const fs::path& source_file) {
   LOG_INFO(
-      "Searching for includes of '{}' in '{}'", header_file.string(),
-      compile_commands_path.string());
+      "Searching for includes of '{}' in '{}'", source_file,
+      compile_commands_path);
 
-  // Parse compile_commands.json to get all .cpp files
-  std::ifstream file(compile_commands_path);
-  if (!file.is_open())
-    utils::throwf(
-        "Failed to open compile_commands.json: {}",
-        compile_commands_path.string());
+  auto entries = parse_ccj(compile_commands_path);
+
+  fs::path ccj_dir = compile_commands_path.parent_path();
+  auto absolute_maybe = [&](const fs::path& p) -> fs::path {
+    if (p.is_absolute()) return p;
+    return fs::absolute(ccj_dir / p);
+  };
+
+  struct context_s {
+    const fs::path* needle{};
+    bool match{};
+  } context{&source_file, false};
 
   // Create clang index
   CXIndex index = clang_createIndex(0, 0);
   AUTO(clang_disposeIndex(index));
 
-  std::string content(
-      (std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
-
-  auto json_data = boost::json::parse(content);
-  auto& entries = json_data.as_array();
-
-  struct context_s {
-    const fs::path* includee{};
-    const fs::path* includer{};
-    bool match{};
-  } context{&header_file};
-
   // Process each .cpp file
   for (auto&& entry : entries) {
     auto& obj = entry.as_object();
-    fs::path file = obj["file"].as_string().c_str();
-    fs::path dir = obj["directory"].as_string().c_str();
-    fs::path full = dir / file;
-    context.includer = &full;
 
     // Parse command arguments and create translation unit
-    std::string command = obj["command"].as_string().c_str();
+    std::string command{obj["command"].as_string().c_str()};
+
+    fs::path file{obj["file"].as_string().c_str()};
+    fs::path dir{obj["directory"].as_string().c_str()};
+    fs::path full = dir / file;
+
     CXTranslationUnit unit = create_translation_unit(index, full, command);
     AUTO(clang_disposeTranslationUnit(unit));
 
     if (!unit) continue;  // what is this? failure to parse? ¯\_(ツ)_/¯
-    LOG_DEBUG("OK: Examining '{}'", full);
+    LOG_DEBUG("OK: Examining entry for '{}'", obj["file"].as_string().c_str());
     clang_getInclusions(
         unit,
-        [](CXFile included_file, CXSourceLocation* inclusion_stack,
-           unsigned include_len, CXClientData cookie) {
+        [](CXFile included_file, CXSourceLocation*, unsigned,
+           CXClientData cookie) {
           auto* context = static_cast<context_s*>(cookie);
 
           CXString filename = clang_getFileName(included_file);
@@ -181,16 +120,21 @@ std::optional<fs::path> infer(
           LOG_DEBUG("   OK: Saw this includee '{}'", includee);
 
           // Check if this inclusion matches our target header
-          if (includee == *context->includee ||
-              includee.filename() == context->includee->filename()) {
-            LOG_INFO(
-                "SUCCESS: Found includer of '{}' in translation unit '{}'",
-                *context->includee, *context->includer);
+          if (includee == *context->needle ||
+              includee.filename() == context->needle->filename()) {
+            LOG_INFO("SUCCESS: Found includer of '{}'", *context->needle);
             context->match = true;
           }
         },
         &context);
-    if (context.match) return *context.includer;
+
+    if (context.match) {
+      return compile_command{
+        .directory = absolute_maybe(dir),
+        .command = command,
+        .file = absolute_maybe(file),
+      };
+    }
   }
   return std::nullopt;
 }
