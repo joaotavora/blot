@@ -67,5 +67,12 @@ doctest_discover_tests(test_blot)
 # Add system tests for blot executable
 include(test/system-tests.cmake)
 
+# Spoof executable for filesystem interception using overlayfs
+add_executable(spoof_exe src/spoof/main.cpp)
+target_link_libraries(spoof_exe PRIVATE
+  Boost::process
+  fmt::fmt
+)
+
 # Utility targets
 include(cmake/utils.cmake)
