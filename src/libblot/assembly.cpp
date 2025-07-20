@@ -62,9 +62,9 @@ std::string get_compiler_version(const std::string& compiler) {
 }
 
 // Run the compiler with modified command to generate assembly
-compilation_result get_asm(
-    const fs::path& directory, const std::string& command,
-    const fs::path& file) {
+compilation_result get_asm(const compile_command& cmd) {
+  const auto& directory = cmd.directory;
+  const auto& command = cmd.command;
   // Modify the command to generate assembly with debugging info
   // Parse the original command to extract the compiler and its arguments
   std::istringstream iss(command);
@@ -97,7 +97,7 @@ compilation_result get_asm(
   // Add -S
   if (!had_dash_c) {
     args.push_back("-S");
-    args.push_back(file);
+    args.push_back(cmd.file);
   }
   // Add -o - to output to stdout
   args.push_back("-o");

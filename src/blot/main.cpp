@@ -59,12 +59,12 @@ grabbed_input_t grab_input(blot::file_options& fopts) {
       fopts.compile_commands_path = ccj_path;
       LOG_INFO("Detected {}", ccj_path);
     }
-    auto cmd = blot::find_compile_command(ccj_path, *fopts.src_file_name);
+    auto cmd = blot::infer(ccj_path, *fopts.src_file_name);
     if (!cmd) throwf("Can't find an entry for {}", *fopts.src_file_name);
 
     LOG_INFO("Got this command '{}'", cmd->command);
 
-    auto c_result = blot::get_asm(cmd->directory, cmd->command, cmd->file);
+    auto c_result = blot::get_asm(*cmd);
     return c_result;
   } else {
     LOG_INFO("Reading from stdin");

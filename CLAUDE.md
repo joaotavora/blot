@@ -108,7 +108,7 @@ others with Cmake and some sh scripts.
 
 - Purpose: Test the core library functions directly using doctest
 
-- Approach: Call `xpto::blot::find_compile_command` to get the
+- Approach: Call `xpto::blot::infer` to get the
   command, then `xpto::blot::get_asm` to get the asm, then
   `xpto::blot::annotate()` to get the annotation.  Then compare
   results against expected JSON.  Come to think of this these are
