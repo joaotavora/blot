@@ -2,7 +2,7 @@
 
 #include <filesystem>
 
-#include "blot/infer.hpp"
+#include "blot/ccj.hpp"
 #include "test_config.h"
 
 TEST_CASE("infer-basic") {
