@@ -18,4 +18,7 @@ std::optional<fs::path> find_ccj();
 std::optional<compile_command> find_compile_command(
     const fs::path& compile_commands_path, const fs::path& target_file);
 
+std::optional<fs::path> infer(
+    const fs::path& compile_commands_path, const fs::path& header_file);
+
 }  // namespace xpto::blot
