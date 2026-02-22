@@ -7,11 +7,11 @@
     "preserve_unused_labels": false
   },
   "file_options": {
-    "compile_commands_path": "test/fixture/compile_commands.json",
-    "source_file": "test/fixture/fxt-gcc-minimal.cpp"
+    "compile_commands_path": "compile_commands.json",
+    "source_file": "fxt-gcc-minimal.cpp"
   },
   "compiler_invocation": {
-    "compiler_version": "15.1.1",
+    "compiler_version": "15.2.1",
     "compiler": "/usr/bin/c++",
     "args": [
       "-std=c++23",

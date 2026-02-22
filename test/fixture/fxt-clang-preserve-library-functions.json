@@ -7,11 +7,11 @@
     "preserve_unused_labels": false
   },
   "file_options": {
-    "compile_commands_path": "test/fixture/compile_commands.json",
-    "source_file": "test/fixture/fxt-clang-preserve-library-functions.cpp"
+    "compile_commands_path": "compile_commands.json",
+    "source_file": "fxt-clang-preserve-library-functions.cpp"
   },
   "compiler_invocation": {
-    "compiler_version": "20.1.8",
+    "compiler_version": "21.1.8",
     "compiler": "/usr/bin/clang++",
     "args": [
       "-std=c++23",
