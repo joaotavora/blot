@@ -51,7 +51,7 @@ set_target_properties(blot_exe PROPERTIES OUTPUT_NAME blot)
 configure_file(test/test_config.h.in test/test_config.h)
 
 # Doctest runner
-add_executable(test_blot test/main.cpp test/annotation-tests.cpp test/infer-tests.cpp)
+add_executable(test_blot test/api/main.cpp test/api/annotation-tests.cpp test/api/infer-tests.cpp)
 target_include_directories(test_blot PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/test)
 target_link_libraries(test_blot PRIVATE
   blot_lib
@@ -65,7 +65,7 @@ include(doctest)
 doctest_discover_tests(test_blot)
 
 # Add system tests for blot executable
-include(test/system-tests.cmake)
+include(test/cli/system-tests.cmake)
 
 # Spoof executable for filesystem interception using overlayfs
 add_executable(spoof_exe src/spoof/main.cpp)

@@ -19,8 +19,8 @@ endif()
 
 # Regenerate fixture files
 add_custom_target(regenerate-fixtures
-  COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/test/regenerate-fixtures.sh
-          ${CMAKE_CURRENT_BINARY_DIR}/blot 
+  COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/test/util/regenerate-fixtures.sh
+          ${CMAKE_CURRENT_BINARY_DIR}/blot
           test/fixture
   WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
   COMMENT "Regenerating fixture files"
