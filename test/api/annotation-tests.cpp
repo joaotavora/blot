@@ -15,16 +15,10 @@ namespace json = boost::json;
 
 struct TestFixture {
   fs::path fixture_dir;
-  fs::path ccj_path;
   fs::path original_dir;
 
   TestFixture() : fixture_dir{TEST_FIXTURE_DIR} {
     original_dir = fs::current_path();
-
-    ccj_path = fixture_dir / "compile_commands.json";
-
-    // Change to fixture directory for relative path compilation
-    fs::current_path(fixture_dir);
   }
 
   TestFixture(const TestFixture&) = default;
@@ -36,13 +30,22 @@ struct TestFixture {
     fs::current_path(original_dir);
   }
 
-  // Reusable test function for any fixture
+  // Reusable test function for any fixture (new API: just pass fixture name)
   void test_annotation_against_expectation(
-      const fs::path& cpp_file, const fs::path& expectation_file,
-      const fs::path& compile_commands_file,
+      const std::string& fixture_name,
       const xpto::blot::annotation_options& aopts = {}) {
+    auto fixture_subdir = fixture_dir / fixture_name;
+
+    // Change to fixture subdirectory
+    fs::current_path(fixture_subdir);
+
+    // Use standard names within each fixture
+    auto ccj_file = fs::path("compile_commands.json");
+    auto cpp_file = fs::path("source.cpp");
+    auto expectation_file = fs::path("expected.json");
+
     // Generate assembly from compile commands
-    auto cmd = xpto::blot::infer(compile_commands_file, cpp_file);
+    auto cmd = xpto::blot::infer(ccj_file, cpp_file);
     REQUIRE(cmd.has_value());
     auto c_result = xpto::blot::get_asm(*cmd);
 
@@ -84,66 +87,60 @@ struct TestFixture {
 TestFixture fixture;
 
 TEST_CASE("api_gcc_basic") {
-  fixture.test_annotation_against_expectation(
-      "fxt-gcc-basic.cpp", "fxt-gcc-basic.json", fixture.ccj_path);
+  fixture.test_annotation_against_expectation("gcc-basic");
 }
 
 TEST_CASE("api_gcc_still_pretty_basic") {
-  fixture.test_annotation_against_expectation(
-      "fxt-gcc-still-pretty-basic.cpp", "fxt-gcc-still-pretty-basic.json",
-      fixture.ccj_path);
+  fixture.test_annotation_against_expectation("gcc-still-pretty-basic");
 }
 
 TEST_CASE("api_gcc_demangle") {
   fixture.test_annotation_against_expectation(
-      "fxt-gcc-demangle.cpp", "fxt-gcc-demangle.json", fixture.ccj_path,
-      {.demangle = true});
+      "gcc-demangle", {.demangle = true});
 }
 
 TEST_CASE("api_gcc_preserve_directives") {
   fixture.test_annotation_against_expectation(
-      "fxt-gcc-preserve-directives.cpp", "fxt-gcc-preserve-directives.json",
-      fixture.ccj_path,
+      "gcc-preserve-directives",
       {.preserve_directives = true, .preserve_comments = true});
 }
 
 TEST_CASE("api_gcc_preserve_library_functions") {
   fixture.test_annotation_against_expectation(
-      "fxt-gcc-preserve-library-functions.cpp",
-      "fxt-gcc-preserve-library-functions.json", fixture.ccj_path,
-      {.preserve_library_functions = true});
+      "gcc-preserve-library-functions", {.preserve_library_functions = true});
 }
 
 TEST_CASE("api_gcc_no_preserve_library_functions") {
   fixture.test_annotation_against_expectation(
-      "fxt-gcc-preserve-library-functions.cpp",
-      "fxt-gcc-no-preserve-library-functions.json", fixture.ccj_path,
+      "gcc-no-preserve-library-functions",
       {.preserve_library_functions = false});
 }
 
 TEST_CASE("api_gcc_minimal") {
-  fixture.test_annotation_against_expectation(
-      "fxt-gcc-minimal.cpp", "fxt-gcc-minimal.json", fixture.ccj_path);
+  fixture.test_annotation_against_expectation("gcc-minimal");
 }
 
 TEST_CASE("api_clang_preserve_library_functions") {
   fixture.test_annotation_against_expectation(
-      "fxt-clang-preserve-library-functions.cpp",
-      "fxt-clang-preserve-library-functions.json", fixture.ccj_path,
-      {.preserve_library_functions = true});
+      "clang-preserve-library-functions", {.preserve_library_functions = true});
 }
 
 TEST_CASE("api_clang_demangle") {
   fixture.test_annotation_against_expectation(
-      "fxt-clang-demangle.cpp", "fxt-clang-demangle.json", fixture.ccj_path,
-      {.demangle = true});
+      "clang-demangle", {.demangle = true});
 }
 
 TEST_CASE("api_gcc_errors") {
   // This test verifies that compilation errors are properly handled
-  auto cmd = xpto::blot::infer(fixture.ccj_path, "fxt-gcc-errors.cpp");
+  auto fixture_subdir = fixture.fixture_dir / "gcc-errors";
+  fs::current_path(fixture_subdir);
+
+  auto cmd = xpto::blot::infer("compile_commands.json", "source.cpp");
   REQUIRE(cmd.has_value());
 
   // The get_asm function should throw when compilation fails
   CHECK_THROWS_AS(xpto::blot::get_asm(*cmd), std::runtime_error);
+
+  // Return to fixture root
+  fs::current_path(fixture.fixture_dir);
 }

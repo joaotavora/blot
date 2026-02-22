@@ -8,7 +8,7 @@
   },
   "file_options": {
     "compile_commands_path": "compile_commands.json",
-    "source_file": "fxt-clang-preserve-library-functions.cpp"
+    "source_file": "source.cpp"
   },
   "compiler_invocation": {
     "compiler_version": "21.1.8",
@@ -18,7 +18,7 @@
       "-g",
       "-O0",
       "-S",
-      "fxt-clang-preserve-library-functions.cpp",
+      "source.cpp",
       "-g1",
       "-o",
       "-"

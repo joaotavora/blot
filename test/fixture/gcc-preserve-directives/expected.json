@@ -8,7 +8,7 @@
   },
   "file_options": {
     "compile_commands_path": "compile_commands.json",
-    "source_file": "fxt-gcc-preserve-directives.cpp"
+    "source_file": "source.cpp"
   },
   "compiler_invocation": {
     "compiler_version": "15.2.1",
@@ -18,21 +18,21 @@
       "-g",
       "-O2",
       "-S",
-      "fxt-gcc-preserve-directives.cpp",
+      "source.cpp",
       "-g1",
       "-o",
       "-"
     ]
   },
   "assembly": [
-    "\t.file\t\"fxt-gcc-preserve-directives.cpp\"",
+    "\t.file\t\"source.cpp\"",
     "\t.text",
-    "\t.file 0 \"/home/joao/Source/Cpp/blot/test/fixture\" \"fxt-gcc-preserve-directives.cpp\"",
+    "\t.file 0 \"/home/joao/Source/Cpp/blot/test/fixture/gcc-preserve-directives\" \"source.cpp\"",
     "\t.p2align 4",
     "\t.globl\t_Z12process_datav",
     "\t.type\t_Z12process_datav, @function",
     "_Z12process_datav:",
-    "\t.file 1 \"fxt-gcc-preserve-directives.cpp\"",
+    "\t.file 1 \"source.cpp\"",
     "\t.loc 1 5 20",
     "\t.cfi_startproc",
     "\t.loc 1 15 1",
@@ -816,8 +816,8 @@
     "\t.string\t\"_ZSt8_DestroyIPiiEvT_S1_RSaIT0_E\"",
     "\t.string\t\"_ZNSt6vectorIiSaIiEED4Ev\"",
     "\t.section\t.debug_line_str,\"MS\",@progbits,1",
-    "\t.string\t\"fxt-gcc-preserve-directives.cpp\"",
-    "\t.string\t\"/home/joao/Source/Cpp/blot/test/fixture\"",
+    "\t.string\t\"/home/joao/Source/Cpp/blot/test/fixture/gcc-preserve-directives\"",
+    "\t.string\t\"source.cpp\"",
     "\t.ident\t\"GCC: (GNU) 15.2.1 20260209\"",
     "\t.section\t.note.GNU-stack,\"\",@progbits"
   ],
