@@ -19,9 +19,9 @@ set -e
 #   test/util/regenerate-fixtures.sh build-Debug/blot test/fixture
 #
 # The script:
-# 1. Reads each fxt-*.json file in the fixture directory
-# 2. Extracts the source file, compile_commands.json, and annotation options
-# 3. Runs blot with those options to regenerate the fixture
+# 1. Finds all subdirectories with expected.json
+# 2. Reads annotation options from expected.json
+# 3. Runs blot to regenerate the fixture's expected.json
 # 4. Removes directory-specific fields (cwd, compiler_invocation.directory)
 
 if [ $# -ne 2 ]; then
@@ -29,23 +29,31 @@ if [ $# -ne 2 ]; then
   exit 1
 fi
 
-# Convert to absolute paths so we can change directories
+# Convert to absolute paths
 BLOT=$(realpath "$1")
 FIXTURE_DIR=$(realpath "$2")
 
-# Change to fixture directory to match compile_commands.json expectations
-cd "$FIXTURE_DIR"
+# Save original directory
+ORIGINAL_DIR=$(pwd)
 
-for json_path in fxt-*.json; do
-  echo "Processing $json_path..."
+# Find all subdirectories with expected.json
+for fixture_subdir in "$FIXTURE_DIR"/*/; do
+  expected_json="${fixture_subdir}expected.json"
 
-  # Read source file and compile_commands.json from JSON file_options
-  # Use basename since we're in the fixture directory
-  cpp_file=$(jq -r '.file_options.source_file' "$json_path" | xargs basename)
-  ccj_file=$(jq -r '.file_options.compile_commands_path' "$json_path" | xargs basename)
+  # Skip if no expected.json
+  if [ ! -f "$expected_json" ]; then
+    continue
+  fi
 
+  fixture_name=$(basename "$fixture_subdir")
+  echo "Processing $fixture_name..."
+
+  # Change to the fixture subdirectory
+  cd "$fixture_subdir"
+
+  # Extract annotation options
   add_flag_maybe() {
-    if jq -e ".annotation_options.${1} == true" "$json_path" >/dev/null; then
+    if jq -e ".annotation_options.${1} == true" expected.json >/dev/null; then
       flags+=("$2")
     fi
   }
@@ -56,11 +64,14 @@ for json_path in fxt-*.json; do
   add_flag_maybe "preserve_comments"          "--preserve-comments"
   add_flag_maybe "preserve_unused_labels"     "--preserve-unused-labels"
 
-  echo "Running: $BLOT --ccj=$ccj_file $cpp_file ${flags[*]} --json"
-  "$BLOT" --ccj="$ccj_file" "$cpp_file" "${flags[@]}" --json \
-    | jq 'del(.cwd) | del(.compiler_invocation.directory)'   \
-    > "$json_path"
-  echo "Regenerated $json_path"
+  echo "Running: $BLOT --ccj=compile_commands.json source.cpp ${flags[*]} --json"
+  "$BLOT" --ccj=compile_commands.json source.cpp "${flags[@]}" --json \
+    | jq 'del(.cwd) | del(.compiler_invocation.directory)' \
+    > expected.json
+  echo "Regenerated $fixture_name/expected.json"
+
+  # Return to original directory
+  cd "$ORIGINAL_DIR"
 done
 
 echo "Fixture regeneration complete!"

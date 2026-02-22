@@ -8,7 +8,7 @@
   },
   "file_options": {
     "compile_commands_path": "compile_commands.json",
-    "source_file": "fxt-gcc-basic.cpp"
+    "source_file": "source.cpp"
   },
   "compiler_invocation": {
     "compiler_version": "15.2.1",
@@ -18,7 +18,7 @@
       "-g",
       "-O2",
       "-S",
-      "fxt-gcc-basic.cpp",
+      "source.cpp",
       "-g1",
       "-o",
       "-"

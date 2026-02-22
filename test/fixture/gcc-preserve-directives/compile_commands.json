@@ -1,0 +1,8 @@
+[
+  {
+    "directory": ".",
+    "command": "/usr/bin/c++ -std=c++23 -g -O2 -o fxt-gcc-preserve-directives.o -c source.cpp",
+    "file": "source.cpp",
+    "output": "source.o"
+  }
+]

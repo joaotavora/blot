@@ -8,7 +8,7 @@
   },
   "file_options": {
     "compile_commands_path": "compile_commands.json",
-    "source_file": "fxt-gcc-errors.cpp"
+    "source_file": "source.cpp"
   },
   "compiler_invocation": {
     "compiler_version": "15.2.1",
@@ -18,20 +18,22 @@
       "-g",
       "-O2",
       "-S",
-      "fxt-gcc-errors.cpp",
+      "source.cpp",
       "-g1",
       "-o",
       "-"
     ]
   },
-  "error": {
-    "name": "xpto::blot::compilation_error",
-    "details": "Compiler failed with exit code 1",
-    "dribble": [
-      "fxt-gcc-errors.cpp:4:10: fatal error: frankinbogen: No such file or directory",
-      "    4 | #include <frankinbogen>  // Invalid/non-existent header",
-      "      |          ^~~~~~~~~~~~~~",
-      "compilation terminated."
-    ]
-  }
+  "assembly": [
+    "main:",
+    "\txorl\t%eax, %eax",
+    "\tret"
+  ],
+  "line_mappings": [
+    {
+      "source_line": 2,
+      "asm_start": 2,
+      "asm_end": 3
+    }
+  ]
 }

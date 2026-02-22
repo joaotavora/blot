@@ -2,13 +2,13 @@
   "annotation_options": {
     "demangle": false,
     "preserve_directives": false,
-    "preserve_library_functions": false,
+    "preserve_library_functions": true,
     "preserve_comments": false,
     "preserve_unused_labels": false
   },
   "file_options": {
     "compile_commands_path": "compile_commands.json",
-    "source_file": "fxt-gcc-preserve-library-functions.cpp"
+    "source_file": "source.cpp"
   },
   "compiler_invocation": {
     "compiler_version": "15.2.1",
@@ -18,7 +18,7 @@
       "-g",
       "-O0",
       "-S",
-      "fxt-gcc-preserve-library-functions.cpp",
+      "source.cpp",
       "-g1",
       "-o",
       "-"
@@ -34,21 +34,37 @@
     "\tmovq\t%rax, %rdi",
     "\tcall\t_ZNKSt6vectorIiSaIiEE4sizeEv",
     "\tleave",
+    "\tret",
+    "_ZNKSt6vectorIiSaIiEE4sizeEv:",
+    "\tpushq\t%rbp",
+    "\tmovq\t%rsp, %rbp",
+    "\tmovq\t%rdi, -24(%rbp)",
+    "\tmovq\t-24(%rbp), %rax",
+    "\tmovq\t8(%rax), %rdx",
+    "\tmovq\t-24(%rbp), %rax",
+    "\tmovq\t(%rax), %rax",
+    "\tsubq\t%rax, %rdx",
+    "\tmovq\t%rdx, %rax",
+    "\tsarq\t$2, %rax",
+    "\tmovq\t%rax, -8(%rbp)",
+    "\tcmpq\t$0, -8(%rbp)",
+    "\tmovq\t-8(%rbp), %rax",
+    "\tpopq\t%rbp",
     "\tret"
   ],
   "line_mappings": [
     {
-      "source_line": 4,
+      "source_line": 5,
       "asm_start": 2,
       "asm_end": 5
     },
     {
-      "source_line": 5,
+      "source_line": 6,
       "asm_start": 6,
       "asm_end": 8
     },
     {
-      "source_line": 6,
+      "source_line": 7,
       "asm_start": 9,
       "asm_end": 10
     }
