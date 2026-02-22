@@ -67,11 +67,21 @@ doctest_discover_tests(test_blot)
 # Add system tests for blot executable
 include(test/cli/system-tests.cmake)
 
+# Add JSONRPC server tests
+include(test/jsonrpc-tests.cmake)
+
 # Spoof executable for filesystem interception using overlayfs
 add_executable(spoof_exe src/spoof/main.cpp)
 target_link_libraries(spoof_exe PRIVATE
   Boost::process
   fmt::fmt
+)
+
+# JSONRPC server executable
+add_executable(blot_jsonrpc_server src/jsonrpc_server/main.cpp)
+target_include_directories(blot_jsonrpc_server PRIVATE include)
+target_link_libraries(blot_jsonrpc_server PRIVATE
+  blot_lib
 )
 
 # Utility targets
