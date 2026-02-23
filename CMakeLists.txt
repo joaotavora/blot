@@ -48,11 +48,11 @@ target_link_libraries(blot_exe PRIVATE
 set_target_properties(blot_exe PROPERTIES OUTPUT_NAME blot)
 
 # Generate test configuration header
-configure_file(test/test_config.h.in test/test_config.h)
+configure_file(test/api/test_config.h.in test/api/test_config.h)
 
 # Doctest runner
 add_executable(test_blot test/api/main.cpp test/api/annotation-tests.cpp test/api/infer-tests.cpp)
-target_include_directories(test_blot PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/test)
+target_include_directories(test_blot PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/test/api)
 target_link_libraries(test_blot PRIVATE
   blot_lib
   doctest::doctest
@@ -68,7 +68,7 @@ doctest_discover_tests(test_blot)
 include(test/cli/system-tests.cmake)
 
 # Add JSONRPC server tests
-include(test/jsonrpc-tests.cmake)
+include(test/jsonrpc/jsonrpc-tests.cmake)
 
 # Spoof executable for filesystem interception using overlayfs
 add_executable(spoof_exe src/spoof/main.cpp)
