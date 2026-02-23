@@ -115,3 +115,162 @@ TEST_CASE("api_gcc_errors") {
   // The get_asm function should throw when compilation fails
   CHECK_THROWS_AS(xpto::blot::get_asm(*cmd), std::runtime_error);
 }
+
+TEST_CASE("api_gcc_includes_source") {
+  // Annotating the TU directly (no target_file): main should appear, thingy
+  // should not (it lives in the included header).
+  auto fixture = fs::path(TEST_FIXTURE_DIR) / "gcc-includes";
+  fs::current_path(fixture);
+
+  auto cmd = xpto::blot::infer("compile_commands.json", "source.cpp");
+  REQUIRE(cmd.has_value());
+  auto c_result = xpto::blot::get_asm(*cmd);
+
+  auto a_result = xpto::blot::annotate(c_result.assembly, {});
+  auto lines = xpto::blot::apply_demanglings(a_result);
+
+  bool found_main{false}, found_thingy_label{false};
+  for (auto& l : lines) {
+    if (l == "main:") found_main = true;
+    // thingy may appear in a call instruction inside main's body, but its
+    // function header (a label ending with ':') should not be present.
+    if (l.ends_with(':') && l.find("thingy") != std::string::npos)
+      found_thingy_label = true;
+  }
+  CHECK(found_main);
+  CHECK(!found_thingy_label);
+}
+
+TEST_CASE("api_gcc_includes_header") {
+  // Annotating a header file via target_file: thingy (defined in header.hpp)
+  // should appear; main (defined in the including TU) should not.
+  auto fixture = fs::path(TEST_FIXTURE_DIR) / "gcc-includes";
+  fs::current_path(fixture);
+
+  auto cmd = xpto::blot::infer("compile_commands.json", "header.hpp");
+  REQUIRE(cmd.has_value());
+  auto c_result = xpto::blot::get_asm(*cmd);
+
+  auto a_result =
+      xpto::blot::annotate(c_result.assembly, {}, fs::path{"header.hpp"});
+  auto lines = xpto::blot::apply_demanglings(a_result);
+
+  bool found_main{false}, found_thingy_label{false};
+  for (auto& l : lines) {
+    if (l == "main:") found_main = true;
+    if (l.ends_with(':') && l.find("thingy") != std::string::npos)
+      found_thingy_label = true;
+  }
+  CHECK(found_thingy_label);
+  CHECK(!found_main);
+
+  // Line mappings should reference lines in header.hpp (thingy body is at
+  // lines 4-6 of that file).
+  REQUIRE(!a_result.linemap.empty());
+  for (auto& [src_line, asm_start, asm_end] : a_result.linemap) {
+    CHECK(src_line >= 4);
+    CHECK(src_line <= 6);
+  }
+}
+
+// Returns true if line looks like a function label that contains needle.
+// Handles GCC ("_Zfoo:") and Clang ("_Zfoo:   # @_Zfoo") styles.
+static bool is_label_with(const std::string& line, std::string_view needle) {
+  // Label lines are non-indented and contain ':' somewhere.
+  return !line.starts_with('\t') && line.find(':') != std::string::npos &&
+         line.find(needle) != std::string::npos;
+}
+
+// Two headers in different directories both named header.hpp, both included
+// by a single source.cpp.  annotate() must use the full path to distinguish
+// them, not just the basename.
+TEST_CASE("api_gcc_deep_hierarchy_2_outer") {
+  fs::path fixture = fs::path{TEST_FIXTURE_DIR} / "gcc-deep-hierarchy-2";
+  fs::current_path(fixture);
+
+  auto cmd = xpto::blot::infer("compile_commands.json", fixture / "header.hpp");
+  REQUIRE(cmd.has_value());
+  auto c_result = xpto::blot::get_asm(*cmd);
+
+  // Ask for the outer header.hpp by absolute path.
+  auto a_result =
+      xpto::blot::annotate(c_result.assembly, {}, fixture / "header.hpp");
+  auto lines = xpto::blot::apply_demanglings(a_result);
+
+  bool found_outer{false}, found_inner{false};
+  for (auto& l : lines) {
+    if (is_label_with(l, "outer")) found_outer = true;
+    if (is_label_with(l, "inner")) found_inner = true;
+  }
+  CHECK(found_outer);
+  CHECK(!found_inner);
+}
+
+TEST_CASE("api_gcc_deep_hierarchy_2_inner") {
+  fs::path fixture = fs::path{TEST_FIXTURE_DIR} / "gcc-deep-hierarchy-2";
+  fs::current_path(fixture);
+
+  auto cmd = xpto::blot::infer(
+      "compile_commands.json", fixture / "inner" / "header.hpp");
+  REQUIRE(cmd.has_value());
+  auto c_result = xpto::blot::get_asm(*cmd);
+
+  // Ask for inner/header.hpp by absolute path.
+  auto a_result = xpto::blot::annotate(
+      c_result.assembly, {}, fixture / "inner" / "header.hpp");
+  auto lines = xpto::blot::apply_demanglings(a_result);
+
+  bool found_outer{false}, found_inner{false};
+  for (auto& l : lines) {
+    if (is_label_with(l, "outer")) found_outer = true;
+    if (is_label_with(l, "inner")) found_inner = true;
+  }
+  CHECK(found_inner);
+  CHECK(!found_outer);
+}
+
+// Same as api_gcc_deep_hierarchy_2_* but compiled with clang++.
+// Clang emits an explicit directory on every .file entry (e.g. "." and
+// "./inner"), whereas GCC leaves the directory empty for non-primary files.
+TEST_CASE("api_clang_deep_hierarchy_2_outer") {
+  fs::path fixture = fs::path{TEST_FIXTURE_DIR} / "clang-deep-hierarchy-2";
+  fs::current_path(fixture);
+
+  auto cmd = xpto::blot::infer("compile_commands.json", fixture / "header.hpp");
+  REQUIRE(cmd.has_value());
+  auto c_result = xpto::blot::get_asm(*cmd);
+
+  auto a_result =
+      xpto::blot::annotate(c_result.assembly, {}, fixture / "header.hpp");
+  auto lines = xpto::blot::apply_demanglings(a_result);
+
+  bool found_outer{false}, found_inner{false};
+  for (auto& l : lines) {
+    if (is_label_with(l, "outer")) found_outer = true;
+    if (is_label_with(l, "inner")) found_inner = true;
+  }
+  CHECK(found_outer);
+  CHECK(!found_inner);
+}
+
+TEST_CASE("api_clang_deep_hierarchy_2_inner") {
+  fs::path fixture = fs::path{TEST_FIXTURE_DIR} / "clang-deep-hierarchy-2";
+  fs::current_path(fixture);
+
+  auto cmd = xpto::blot::infer(
+      "compile_commands.json", fixture / "inner" / "header.hpp");
+  REQUIRE(cmd.has_value());
+  auto c_result = xpto::blot::get_asm(*cmd);
+
+  auto a_result = xpto::blot::annotate(
+      c_result.assembly, {}, fixture / "inner" / "header.hpp");
+  auto lines = xpto::blot::apply_demanglings(a_result);
+
+  bool found_outer{false}, found_inner{false};
+  for (auto& l : lines) {
+    if (is_label_with(l, "outer")) found_outer = true;
+    if (is_label_with(l, "inner")) found_inner = true;
+  }
+  CHECK(found_inner);
+  CHECK(!found_outer);
+}

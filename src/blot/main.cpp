@@ -109,9 +109,10 @@ json::object meta_to_json(const blot::compiler_invocation& inv) {
 }
 
 json::object annotate_to_json(
-    std::string_view input, const blot::annotation_options& aopts) {
+    std::string_view input, const blot::annotation_options& aopts,
+    const std::optional<fs::path>& target_file = std::nullopt) {
   json::object res;
-  auto a_result = annotate(input, aopts);
+  auto a_result = annotate(input, aopts, target_file);
   auto output_lines = blot::apply_demanglings(a_result);
 
   json::array assembly_lines(output_lines.begin(), output_lines.end());
@@ -149,7 +150,7 @@ int main_nojson(blot::file_options& fopts, blot::annotation_options& aopts) {
           }
         },
         grab_input(fopts));
-    auto a_result = annotate(input, aopts);
+    auto a_result = annotate(input, aopts, fopts.src_file_name);
     for (auto&& l : blot::apply_demanglings(a_result)) {
       std::cout << l << "\n";
     }
@@ -198,7 +199,7 @@ int main(int argc, char* argv[]) {
           }
         },
         grab_input(fopts));
-    auto res = annotate_to_json(assembly, aopts);
+    auto res = annotate_to_json(assembly, aopts, fopts.src_file_name);
     json_result.insert(res.begin(), res.end());
   } catch (blot::compilation_error& e) {
     json_result["compiler_invocation"] = meta_to_json(e.invocation);
