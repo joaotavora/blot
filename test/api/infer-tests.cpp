@@ -2,7 +2,6 @@
 
 #include <filesystem>
 
-#include "../src/libblot/auto.hpp"
 #include "blot/ccj.hpp"
 #include "test_config.h"
 
@@ -67,8 +66,6 @@ TEST_CASE("infer-deep-outer-by-relative-filename") {
   // compile_commands.json file.  "header.hpp" therefore becomes
   // fixture/header.hpp, which is the outer header included by source-1.cpp.
   fs::path fixture = fs::path{TEST_FIXTURE_DIR} / "gcc-deep-hierarchy";
-  fs::path saved = fs::current_path();
-  AUTO(fs::current_path(saved));
   fs::current_path(fixture);
 
   auto result = xpto::blot::infer("compile_commands.json", "header.hpp");
@@ -82,8 +79,6 @@ TEST_CASE("infer-deep-inner-by-relative-path") {
   // compile_commands.json file.  "inner/header.hpp" therefore becomes
   // fixture/inner/header.hpp, which is included only by source-2.cpp.
   fs::path fixture = fs::path{TEST_FIXTURE_DIR} / "gcc-deep-hierarchy";
-  fs::path saved = fs::current_path();
-  AUTO(fs::current_path(saved));
   fs::current_path(fixture);
 
   auto result = xpto::blot::infer("compile_commands.json", "inner/header.hpp");

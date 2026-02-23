@@ -5,7 +5,6 @@
 #include <fstream>
 #include <string>
 
-#include "../src/libblot/auto.hpp"
 #include "blot/assembly.hpp"
 #include "blot/blot.hpp"
 #include "blot/ccj.hpp"
@@ -108,8 +107,6 @@ TEST_CASE("api_clang_demangle") {
 TEST_CASE("api_gcc_errors") {
   // This test verifies that compilation errors are properly handled
   auto fixture = fs::path(TEST_FIXTURE_DIR) / "gcc-errors";
-  fs::path saved = fs::current_path();
-  AUTO(fs::current_path(saved));
   fs::current_path(fixture);
 
   auto cmd = xpto::blot::infer("compile_commands.json", "source.cpp");
