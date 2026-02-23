@@ -11,11 +11,11 @@ class AtScopeExit {
   Lam m_lam;
 
  public:
-  AtScopeExit(const AtScopeExit &) = delete;
-  AtScopeExit(AtScopeExit &&) = delete;
-  AtScopeExit &operator=(const AtScopeExit &) = delete;
-  AtScopeExit &operator=(AtScopeExit &&) = delete;
-  AtScopeExit(Lam action) : m_lam(static_cast<Lam &&>(action)) {}
+  AtScopeExit(const AtScopeExit&) = delete;
+  AtScopeExit(AtScopeExit&&) = delete;
+  AtScopeExit& operator=(const AtScopeExit&) = delete;
+  AtScopeExit& operator=(AtScopeExit&&) = delete;
+  AtScopeExit(Lam action) : m_lam(static_cast<Lam&&>(action)) {}
   ~AtScopeExit() { m_lam(); }
 };
 }  // namespace xpto::utils
