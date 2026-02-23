@@ -67,6 +67,7 @@ void sweeping(
 
     auto match = [&](auto&& re, matches_t& out_matches,
                      int offset = 0) -> bool {
+      // NOLINTNEXTLINE(*-pointer-arithmetic)
       auto from = it->cbegin() + offset;
       match_t a(from, it->cend());
       if (RE2::FindAndConsumeN(
@@ -455,6 +456,7 @@ std::vector<std::string> apply_demanglings(const annotation_result& result) {
 
       // Check if mangled_sv is within this line
       if (mangled_sv.data() >= line.data() &&
+          // NOLINTNEXTLINE(*-pointer-arithmetic*)
           mangled_sv.data() + mangled_sv.size() <= line.data() + line.size()) {
         line_demanglings.emplace_back(mangled_sv, demangled);
         ++demangling_it;
@@ -487,7 +489,7 @@ std::vector<std::string> apply_demanglings(const annotation_result& result) {
 
 annotation_result annotate(
     std::span<const char> input, const annotation_options& aopts,
-    std::optional<fs::path> target_file) {
+    const std::optional<fs::path>& target_file) {
   LOG_DEBUG(
       "-pd={}\n-pl={}\n-pc={}\n-pu={}\n-dm={}", aopts.preserve_directives,
       aopts.preserve_library_functions, aopts.preserve_comments,
