@@ -2,6 +2,7 @@
 
 #include <re2/re2.h>
 
+#include <filesystem>
 #include <map>
 #include <set>
 #include <stdexcept>
@@ -11,6 +12,8 @@
 #include "linespan.hpp"
 #include "logger.hpp"
 #include "utils.hpp"
+
+namespace fs = std::filesystem;
 
 namespace xpto::blot {
 
@@ -126,11 +129,12 @@ struct parser_state {
   std::unordered_map<label_t, std::vector<label_t>> routines;
   std::unordered_set<label_t> globals{};
   std::optional<label_t> current_global{};
-  // The "main_file" is the source file in which we're interested.
-  // For now, we just set it to the _first_ '.file' directive (DWARF5,
-  // presumably) we encounter in the assembly output.
-  std::optional<file_info> main_file{};
-  std::unordered_set<label_t> main_file_routines{};
+  // Base directory of the compilation (from the DWARF5 .file 0 entry).
+  // Used to resolve relative .file paths to absolute ones for target matching.
+  fs::path compile_dir{};
+  // compiler info on file asked to annotate, or first .file in asm output
+  std::optional<file_info> annotation_target_info{};
+  std::unordered_set<label_t> target_file_routines{};
   std::unordered_set<label_t> used_labels{};
 
   // Internal linemap using map/set for efficient merging
@@ -175,8 +179,10 @@ struct parser_state {
 };
 
 void intermediate(parser_state& s, const annotation_options& o) {
-  if (!s.main_file)
-    utils::throwf<std::runtime_error>("Cannot proceed without a 'main_file'");
+  if (!s.annotation_target_info) {
+    utils::throwf<std::runtime_error>(
+        "Annotation target info not found in asm directives");
+  }
   if (o.preserve_library_functions) {
     for (auto&& [label, callees] : s.routines) {
       s.used_labels.insert(label);
@@ -185,7 +191,7 @@ void intermediate(parser_state& s, const annotation_options& o) {
       }
     }
   } else {
-    for (auto&& label : s.main_file_routines) {
+    for (auto&& label : s.target_file_routines) {
       s.used_labels.insert(label);
       for (auto&& callee : s.routines[label]) {
         s.used_labels.insert(callee);
@@ -195,7 +201,9 @@ void intermediate(parser_state& s, const annotation_options& o) {
 }
 
 auto first_pass(
-    const auto& input, parser_state& s, const annotation_options& options) {
+    const auto& input, parser_state& s, const annotation_options& options,
+    const std::optional<fs::path>& target_file) {
+  auto annotation_target = target_file;  // copy
   using output_t =
       std::vector<typename std::decay_t<decltype(input)>::value_type>;
   output_t output;
@@ -251,17 +259,68 @@ auto first_pass(
             LOG_DEBUG(
                 "FP2.4.1 added file {} -> {} dir={} md5={}", fileno,
                 info.filename, info.directory, info.md5);
-            if (!s.main_file) {
-              s.main_file = info;
-            } else if (*s.main_file == info) {
-              s.main_file->tags.insert(fileno);
+
+            // Presumably, .file 0 in DWARF5 format always carries the
+            // compilation directory.
+            if (fileno == 0) {
+              s.compile_dir = fs::absolute(info.directory);
+              if (!annotation_target) {
+                annotation_target = s.compile_dir / info.filename;
+                s.annotation_target_info = info;
+              }
+            } else {
+              if (s.compile_dir.empty()) {
+                utils::throwf<std::runtime_error>(
+                    "Couldn't find compilation directory in asm directives.");
+              }
+              // Reconstruct full path of this .file entry and compare
+              // against the requested (or guessed) annotation_target.
+              // The reason for this complication is different ways to
+              // report on files here.  Reconstructing the directory
+              // needs to be done carefully.  For the same 'source.cpp'
+              // file, different compilers emit different info.
+              //
+              // GCC:
+              // .file "source.cpp"        # ignored, doesn't match here
+              // .file 0 "/…/gcc-deep-hierarchy-2" "source.cpp"
+              // .file 1 "header.hpp"
+              // .file 2 "inner/header.hpp"
+              // .file 3 "source.cpp"
+              //
+              // Clang:
+              // .file "source.cpp"
+              // .file 0 "/…/clang-deep-hierarchy-2" "source.cpp" md5 …
+              // .file 1 "." "header.hpp" md5 …
+              // .file 2 "./inner" "header.hpp" md5 …
+              auto entry_path = [&]() -> fs::path {
+                if (!info.directory.empty()) {
+                  auto d = fs::path{info.directory};
+                  if (!d.is_absolute()) d = s.compile_dir / d;
+                  return (d / fs::path{info.filename}).lexically_normal();
+                }
+                return (s.compile_dir / fs::path{info.filename})
+                    .lexically_normal();
+              };
+              //  In either situation above we want entry_path() to
+              //  return:
+              //
+              //  0-> /path/to/clang-deep-hierarchy-2/source.cpp
+              //  1-> /path/to/clang-deep-hierarchy-2/header.hpp
+              //  2-> /path/to/clang-deep-hierarchy-2/inner/header.hpp
+              //  3-> /path/to/clang-deep-hierarchy-2/source.cpp
+              if (entry_path() ==
+                  (s.compile_dir / *annotation_target).lexically_normal()) {
+                if (!s.annotation_target_info) s.annotation_target_info = info;
+                s.annotation_target_info->tags.insert(fileno);
+              }
             }
           } else if (match(r_source_tag)) {
             LOG_TRACE("FP2.5 '{}'", *it);
-            if (s.current_global && s.main_file &&
-                s.main_file->tags.contains(to_size_t(matches[1]))) {
+            if (s.current_global && s.annotation_target_info &&
+                s.annotation_target_info->tags.contains(
+                    to_size_t(matches[1]))) {
               LOG_TRACE("FP2.5.1 '{}'", *it);
-              s.main_file_routines.insert(*s.current_global);
+              s.target_file_routines.insert(*s.current_global);
             }
             LOG_TRACE("Preserve: FP2.5 '{}'", *it);
             preserve();
@@ -347,7 +406,8 @@ annotation_result second_pass(
             LOG_TRACE("SP2.3 '{}'", *it);
             source_linum = [&]() -> std::optional<int> {
               auto fileno = to_size_t(matches[1]);
-              if (s.main_file->tags.contains(fileno)) {
+              if (s.annotation_target_info &&
+                  s.annotation_target_info->tags.contains(fileno)) {
                 return to_size_t(matches[2]);
               } else {
                 return std::nullopt;
@@ -426,7 +486,8 @@ std::vector<std::string> apply_demanglings(const annotation_result& result) {
 }
 
 annotation_result annotate(
-    std::span<const char> input, const annotation_options& aopts) {
+    std::span<const char> input, const annotation_options& aopts,
+    std::optional<fs::path> target_file) {
   LOG_DEBUG(
       "-pd={}\n-pl={}\n-pc={}\n-pu={}\n-dm={}", aopts.preserve_directives,
       aopts.preserve_library_functions, aopts.preserve_comments,
@@ -436,7 +497,7 @@ annotation_result annotate(
   xpto::linespan lspan{input};
   parser_state state{};
 
-  auto fp_output = first_pass(lspan, state, aopts);
+  auto fp_output = first_pass(lspan, state, aopts, target_file);
   intermediate(state, aopts);
   return second_pass(fp_output, state, aopts);
 }

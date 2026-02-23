@@ -137,8 +137,8 @@ std::optional<compile_command> infer(
         &context);
 
     if (context.match) {
-      LOG_INFO("SUCCESS: Found '{}' includer, of '{}'", file, needle);
-      LOG_INFO("SUCCESS: Using compilation command '{}'", file, needle);
+      LOG_INFO("SUCCESS: Found '{}', TU includer of '{}'", file, source_file);
+      LOG_INFO("SUCCESS: Using compilation command '{}'", command);
       return compile_command{
         .directory = normpath(dir),
         .command = command,
