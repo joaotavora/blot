@@ -27,18 +27,14 @@ namespace xpto::blot {
 
 namespace fs = std::filesystem;
 
-/**
- * @brief Searches for a @c compile_commands.json in the current
- * working directory.
+/** @brief Find @c compile_commands.json in current working directory.
  *
  * Returns the absolute path to the file when one is found there, or
  * an empty optional otherwise.
  */
 std::optional<fs::path> find_ccj();
 
-/**
- * @brief Finds the compile command of the translation unit that
- * includes a given header file.
+/** @brief Find compile command covering @p source_file.
  *
  * This function is intended primarily for header files, which do not
  * appear directly in a compile commands database but are compiled as
