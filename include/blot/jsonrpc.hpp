@@ -28,8 +28,8 @@ namespace xpto::blot {
  * an empty optional if the stream reaches EOF before a complete message
  * is received.
  */
-boost::asio::awaitable<std::optional<std::string>>
-read_jsonrpc_message(boost::asio::posix::stream_descriptor& stream);
+boost::asio::awaitable<std::optional<std::string>> read_jsonrpc_message(
+    boost::asio::posix::stream_descriptor& stream);
 
 /** @brief Write one framed JSONRPC message to @p stream.
  *
@@ -37,8 +37,8 @@ read_jsonrpc_message(boost::asio::posix::stream_descriptor& stream);
  * @c Content-Length header, and writes the complete frame to @p stream
  * as a single async operation.
  */
-boost::asio::awaitable<void>
-write_jsonrpc_message(boost::asio::posix::stream_descriptor& stream,
-                      const boost::json::object& msg);
+boost::asio::awaitable<void> write_jsonrpc_message(
+    boost::asio::posix::stream_descriptor& stream,
+    const boost::json::object& msg);
 
 }  // namespace xpto::blot

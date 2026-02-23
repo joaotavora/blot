@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: MIT
 #include "blot/jsonrpc.hpp"
 
+#include <fmt/format.h>
+#include <re2/re2.h>
+
 #include <boost/asio/buffer.hpp>
 #include <boost/asio/read.hpp>
 #include <boost/asio/read_until.hpp>
@@ -8,8 +11,6 @@
 #include <boost/asio/use_awaitable.hpp>
 #include <boost/asio/write.hpp>
 #include <boost/system/error_code.hpp>
-#include <fmt/format.h>
-#include <re2/re2.h>
 #include <istream>
 #include <stdexcept>
 
@@ -18,13 +19,13 @@ namespace xpto::blot {
 namespace asio = boost::asio;
 namespace sys = boost::system;
 
-asio::awaitable<std::optional<std::string>>
-read_jsonrpc_message(asio::posix::stream_descriptor& stream) {
+asio::awaitable<std::optional<std::string>> read_jsonrpc_message(
+    asio::posix::stream_descriptor& stream) {
   try {
     // Read headers until \r\n\r\n
     asio::streambuf buf;
-    co_await asio::async_read_until(stream, buf, "\r\n\r\n",
-                                     asio::use_awaitable);
+    co_await asio::async_read_until(
+        stream, buf, "\r\n\r\n", asio::use_awaitable);
 
     // Parse Content-Length header
     std::istream is(&buf);
@@ -50,7 +51,8 @@ read_jsonrpc_message(asio::posix::stream_descriptor& stream) {
     // First, consume any already-buffered data
     std::size_t buffered{buf.size()};
     if (buffered > 0) {
-      std::size_t to_copy{std::min(buffered, static_cast<std::size_t>(content_length))};
+      std::size_t to_copy{
+        std::min(buffered, static_cast<std::size_t>(content_length))};
       std::istream(&buf).read(content.data(), to_copy);
       buffered = to_copy;
     }
@@ -58,8 +60,8 @@ read_jsonrpc_message(asio::posix::stream_descriptor& stream) {
     // Then read remaining bytes
     if (buffered < static_cast<std::size_t>(content_length)) {
       co_await asio::async_read(
-          stream, asio::buffer(content.data() + buffered,
-                               content_length - buffered),
+          stream,
+          asio::buffer(content.data() + buffered, content_length - buffered),
           asio::use_awaitable);
     }
 
@@ -73,15 +75,14 @@ read_jsonrpc_message(asio::posix::stream_descriptor& stream) {
   }
 }
 
-asio::awaitable<void>
-write_jsonrpc_message(asio::posix::stream_descriptor& stream,
-                      const boost::json::object& msg) {
+asio::awaitable<void> write_jsonrpc_message(
+    asio::posix::stream_descriptor& stream, const boost::json::object& msg) {
   std::string json_str{boost::json::serialize(msg)};
-  std::string full_msg{fmt::format("Content-Length: {}\r\n\r\n{}",
-                                    json_str.size(), json_str)};
+  std::string full_msg{
+    fmt::format("Content-Length: {}\r\n\r\n{}", json_str.size(), json_str)};
 
-  co_await asio::async_write(stream, asio::buffer(full_msg),
-                              asio::use_awaitable);
+  co_await asio::async_write(
+      stream, asio::buffer(full_msg), asio::use_awaitable);
 }
 
 }  // namespace xpto::blot
