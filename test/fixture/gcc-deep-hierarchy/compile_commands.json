@@ -1,0 +1,14 @@
+[
+  {
+    "directory": "/home/joao/Source/Cpp/blot/test/fixture/gcc-deep-hierarchy",
+    "command": "/usr/bin/c++ -std=c++23 -g -O2 -o source-1.o -c source-1.cpp",
+    "file": "source-1.cpp",
+    "output": "source-1.o"
+  },
+  {
+    "directory": "/home/joao/Source/Cpp/blot/test/fixture/gcc-deep-hierarchy",
+    "command": "/usr/bin/c++ -std=c++23 -g -O2 -o source-2.o -c source-2.cpp",
+    "file": "source-2.cpp",
+    "output": "source-2.o"
+  }
+]
