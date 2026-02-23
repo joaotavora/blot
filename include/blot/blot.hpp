@@ -93,7 +93,7 @@ struct annotation_result {
  */
 annotation_result annotate(
     std::span<const char> input, const annotation_options& options,
-    std::optional<std::filesystem::path> target_file = std::nullopt);
+    const std::optional<std::filesystem::path>& target_file = std::nullopt);
 
 /** @brief Return annotated output with symbols demangled.
  *
