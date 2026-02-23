@@ -77,16 +77,25 @@ std::optional<compile_command> infer(
 
   auto entries = parse_ccj(compile_commands_path);
 
-  fs::path ccj_dir = compile_commands_path.parent_path();
-  auto absolute_maybe = [&](const fs::path& p) -> fs::path {
-    if (p.is_absolute()) return p;
-    return fs::absolute(ccj_dir / p);
+  fs::path ccj_dir = fs::absolute(compile_commands_path).parent_path();
+  auto normpath = [&](const fs::path& p) -> fs::path {
+    if (p.is_absolute()) return p.lexically_normal();
+    return (ccj_dir / p).lexically_normal();
   };
+
+  // Relative needles are resolved against the ccj file's directory.
+  fs::path needle = normpath(source_file);
 
   struct context_s {
     const fs::path* needle{};
     bool match{};
-  } context{&source_file, false};
+  } context{&needle, false};
+
+  // Change to the ccj directory before creating the index so that libclang
+  // resolves relative paths (e.g. -I flags) against the right base.
+  fs::path saved_cwd = fs::current_path();
+  AUTO(fs::current_path(saved_cwd));
+  fs::current_path(ccj_dir);
 
   // Create clang index
   CXIndex index = clang_createIndex(0, 0);
@@ -101,27 +110,27 @@ std::optional<compile_command> infer(
 
     fs::path file{obj["file"].as_string().c_str()};
     fs::path dir{obj["directory"].as_string().c_str()};
-    fs::path full = dir / file;
+    fs::path full = normpath(dir / file);
 
     CXTranslationUnit unit = create_translation_unit(index, full, command);
     AUTO(clang_disposeTranslationUnit(unit));
 
-    if (!unit) continue;  // what is this? failure to parse? ¯\_(ツ)_/¯
+    if (!unit) continue;  // failure to parse ¯\_(ツ)_/¯
     LOG_DEBUG("OK: Examining entry for '{}'", obj["file"].as_string().c_str());
+    context.match = false;
     clang_getInclusions(
         unit,
         [](CXFile included_file, CXSourceLocation*, unsigned,
            CXClientData cookie) {
           auto* context = static_cast<context_s*>(cookie);
+          if (context->match) return;
 
           CXString filename = clang_getFileName(included_file);
           AUTO(clang_disposeString(filename));
           fs::path includee = clang_getCString(filename);
           LOG_DEBUG("   OK: Saw this includee '{}'", includee);
 
-          // Check if this inclusion matches our target header
-          if (includee == *context->needle ||
-              includee.filename() == context->needle->filename()) {
+          if (fs::absolute(includee).lexically_normal() == *context->needle) {
             LOG_INFO("SUCCESS: Found includer of '{}'", *context->needle);
             context->match = true;
           }
@@ -130,9 +139,9 @@ std::optional<compile_command> infer(
 
     if (context.match) {
       return compile_command{
-        .directory = absolute_maybe(dir),
+        .directory = normpath(dir),
         .command = command,
-        .file = absolute_maybe(file),
+        .file = normpath(file),
       };
     }
   }

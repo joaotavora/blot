@@ -1,7 +1,7 @@
 [
   {
     "directory": "/home/joao/Source/Cpp/blot/test/fixture/gcc-includes",
-    "command": "/usr/bin/c++ -std=c++23 -g -O2 -I /home/joao/Source/Cpp/blot/test/fixture/gcc-includes/just-an-include-dir -o source.o -c source.cpp",
+    "command": "/usr/bin/c++ -std=c++23 -g -O2 -I ./just-an-include-dir -o source.o -c source.cpp",
     "file": "source.cpp",
     "output": "source.o"
   }
