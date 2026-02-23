@@ -72,7 +72,7 @@ CXTranslationUnit create_translation_unit(
 std::optional<compile_command> infer(
     const fs::path& compile_commands_path, const fs::path& source_file) {
   LOG_INFO(
-      "Searching for includes of '{}' in '{}'", source_file,
+      "Searching TU's including '{}' in '{}'", source_file,
       compile_commands_path);
 
   auto entries = parse_ccj(compile_commands_path);
@@ -131,13 +131,14 @@ std::optional<compile_command> infer(
           LOG_DEBUG("   OK: Saw this includee '{}'", includee);
 
           if (fs::absolute(includee).lexically_normal() == *context->needle) {
-            LOG_INFO("SUCCESS: Found includer of '{}'", *context->needle);
             context->match = true;
           }
         },
         &context);
 
     if (context.match) {
+      LOG_INFO("SUCCESS: Found '{}' includer, of '{}'", file, needle);
+      LOG_INFO("SUCCESS: Using compilation command '{}'", file, needle);
       return compile_command{
         .directory = normpath(dir),
         .command = command,
