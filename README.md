@@ -119,8 +119,17 @@ handling, `libclang` for C++/C parsing, `doctest` for tests)
 
   Header files don't appear in `compile_commands.json`, so blot
   heuristically infers the "includer" translation unit by parsing each
-  entry and walking its full inclusion tree with libclang.  There is
-  decent test coverage for this, but edge cases likely remain.
+  entry and walking its full inclusion tree with libclang.
+
+  There is decent test coverage for this, but edge cases remain.  One
+  of them has to with code injected by sanitizers (UBSan and ASAN),
+  which makes for a very noisy annotation results.  The other has to
+  do with inlining.  In higher optimization settings, the functions
+  that inline the header's code are often not in the header file
+  itself, but rahter in the inferred includer.  What to do?  If we
+  show the includer function we'll be more accurate but likely we'll
+  also show _all_ its callees that have nothing to with the annotation
+  target.  Or we could push a -fno-inline...
 
 * *80%* Unsaved buffer support
 
