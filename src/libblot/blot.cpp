@@ -1,5 +1,6 @@
 #include "blot/blot.hpp"
 
+#include <fmt/std.h>
 #include <re2/re2.h>
 
 #include <filesystem>
@@ -180,10 +181,6 @@ struct parser_state {
 };
 
 void intermediate(parser_state& s, const annotation_options& o) {
-  if (!s.annotation_target_info) {
-    utils::throwf<std::runtime_error>(
-        "Annotation target info not found in asm directives");
-  }
   if (o.preserve_library_functions) {
     for (auto&& [label, callees] : s.routines) {
       s.used_labels.insert(label);
@@ -265,55 +262,61 @@ auto first_pass(
             // compilation directory.
             if (fileno == 0) {
               s.compile_dir = fs::absolute(info.directory);
+              LOG_DEBUG(
+                "FP2.4.1 compile_dir = {}", s.compile_dir);
               if (!annotation_target) {
                 annotation_target = s.compile_dir / info.filename;
+              }
+            }
+            if (s.compile_dir.empty()) {
+              utils::throwf<std::runtime_error>(
+                  "Couldn't find compilation directory in asm directives.");
+            }
+            // Reconstruct full path of this .file entry and compare
+            // against the requested (or guessed) annotation_target.
+            // The reason for this complication is different ways to
+            // report on files here.  Reconstructing the directory
+            // needs to be done carefully.  For the same 'source.cpp'
+            // file, different compilers emit different info.
+            //
+            // GCC:
+            // .file "source.cpp"        # ignored, doesn't match here
+            // .file 0 "/…/gcc-deep-hierarchy-2" "source.cpp"
+            // .file 1 "header.hpp"
+            // .file 2 "inner/header.hpp"
+            // .file 3 "source.cpp"
+            //
+            // Clang:
+            // .file "source.cpp"
+            // .file 0 "/…/clang-deep-hierarchy-2" "source.cpp" md5 …
+            // .file 1 "." "header.hpp" md5 …
+            // .file 2 "./inner" "header.hpp" md5 …
+            auto entry_path = [&]() -> fs::path {
+              if (!info.directory.empty()) {
+                auto d = fs::path{info.directory};
+                if (!d.is_absolute()) d = s.compile_dir / d;
+                return (d / fs::path{info.filename}).lexically_normal();
+              }
+              return (s.compile_dir / fs::path{info.filename})
+                .lexically_normal();
+            };
+            //  In either situation above we want entry_path() to
+            //  return:
+            //
+            //  0-> /path/to/clang-deep-hierarchy-2/source.cpp
+            //  1-> /path/to/clang-deep-hierarchy-2/header.hpp
+            //  2-> /path/to/clang-deep-hierarchy-2/inner/header.hpp
+            //  3-> /path/to/clang-deep-hierarchy-2/source.cpp
+            if (entry_path() ==
+              (s.compile_dir / *annotation_target).lexically_normal()) {
+              LOG_DEBUG(
+                  "FP2.4.1 Matched annotation_target='{}', tag={}",
+                  *annotation_target, fileno);
+              if (!s.annotation_target_info) {
+                LOG_DEBUG("FP2.4.1 Initializing annotation_target_info");
                 s.annotation_target_info = info;
               }
-            } else {
-              if (s.compile_dir.empty()) {
-                utils::throwf<std::runtime_error>(
-                    "Couldn't find compilation directory in asm directives.");
-              }
-              // Reconstruct full path of this .file entry and compare
-              // against the requested (or guessed) annotation_target.
-              // The reason for this complication is different ways to
-              // report on files here.  Reconstructing the directory
-              // needs to be done carefully.  For the same 'source.cpp'
-              // file, different compilers emit different info.
-              //
-              // GCC:
-              // .file "source.cpp"        # ignored, doesn't match here
-              // .file 0 "/…/gcc-deep-hierarchy-2" "source.cpp"
-              // .file 1 "header.hpp"
-              // .file 2 "inner/header.hpp"
-              // .file 3 "source.cpp"
-              //
-              // Clang:
-              // .file "source.cpp"
-              // .file 0 "/…/clang-deep-hierarchy-2" "source.cpp" md5 …
-              // .file 1 "." "header.hpp" md5 …
-              // .file 2 "./inner" "header.hpp" md5 …
-              auto entry_path = [&]() -> fs::path {
-                if (!info.directory.empty()) {
-                  auto d = fs::path{info.directory};
-                  if (!d.is_absolute()) d = s.compile_dir / d;
-                  return (d / fs::path{info.filename}).lexically_normal();
-                }
-                return (s.compile_dir / fs::path{info.filename})
-                    .lexically_normal();
-              };
-              //  In either situation above we want entry_path() to
-              //  return:
-              //
-              //  0-> /path/to/clang-deep-hierarchy-2/source.cpp
-              //  1-> /path/to/clang-deep-hierarchy-2/header.hpp
-              //  2-> /path/to/clang-deep-hierarchy-2/inner/header.hpp
-              //  3-> /path/to/clang-deep-hierarchy-2/source.cpp
-              if (entry_path() ==
-                  (s.compile_dir / *annotation_target).lexically_normal()) {
-                if (!s.annotation_target_info) s.annotation_target_info = info;
-                s.annotation_target_info->tags.insert(fileno);
-              }
+              s.annotation_target_info->tags.insert(fileno);
             }
           } else if (match(r_source_tag)) {
             LOG_TRACE("FP2.5 '{}'", *it);
@@ -336,6 +339,12 @@ auto first_pass(
           }
         }
       });
+  if (!s.annotation_target_info) {
+    utils::throwf<std::runtime_error>(
+        "At end of first pass, no annotation target info for '{}' (converted "
+        "from '{}')",
+        annotation_target.value_or("<empty>"), target_file.value_or("<empty>"));
+  }
   return output;
 }
 

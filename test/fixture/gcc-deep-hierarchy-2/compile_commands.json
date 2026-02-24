@@ -1,8 +1,8 @@
 [
   {
     "directory": "/home/joao/Source/Cpp/blot/test/fixture/gcc-deep-hierarchy-2",
-    "command": "/usr/bin/c++ -std=c++23 -g -O0 -o source.o -c source.cpp",
-    "file": "source.cpp",
-    "output": "source.o"
+    "command": "/usr/bin/c++ -std=c++23 -g -O0 -o /home/joao/Source/Cpp/blot/test/fixture/gcc-deep-hierarchy-2/source.o -c /home/joao/Source/Cpp/blot/test/fixture/gcc-deep-hierarchy-2/source.cpp",
+    "file": "/home/joao/Source/Cpp/blot/test/fixture/gcc-deep-hierarchy-2/source.cpp",
+    "output": "/home/joao/Source/Cpp/blot/test/fixture/gcc-deep-hierarchy-2/source.o"
   }
 ]

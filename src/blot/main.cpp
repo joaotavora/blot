@@ -72,6 +72,17 @@ grabbed_input_t grab_input(blot::file_options& fopts) {
   }
 }
 
+// A relative src_file_name is interpreted relative to the CCJ's directory.
+// Absolutize it using CWD so annotate() can match assembly .file directives.
+std::optional<fs::path> annotation_target(const blot::file_options& fopts) {
+  if (!fopts.src_file_name || fopts.src_file_name->is_absolute())
+    return fopts.src_file_name;
+  if (!fopts.compile_commands_path) return fopts.src_file_name;
+  return fs::absolute(
+             fopts.compile_commands_path->parent_path() / *fopts.src_file_name)
+      .lexically_normal();
+}
+
 json::object aopts_to_json(const blot::annotation_options& aopts) {
   json::object annotation_options;
   annotation_options["demangle"] = aopts.demangle;
@@ -150,7 +161,7 @@ int main_nojson(blot::file_options& fopts, blot::annotation_options& aopts) {
           }
         },
         grab_input(fopts));
-    auto a_result = annotate(input, aopts, fopts.src_file_name);
+    auto a_result = annotate(input, aopts, annotation_target(fopts));
     for (auto&& l : blot::apply_demanglings(a_result)) {
       std::cout << l << "\n";
     }
@@ -199,7 +210,7 @@ int main(int argc, char* argv[]) {
           }
         },
         grab_input(fopts));
-    auto res = annotate_to_json(assembly, aopts, fopts.src_file_name);
+    auto res = annotate_to_json(assembly, aopts, annotation_target(fopts));
     json_result.insert(res.begin(), res.end());
   } catch (blot::compilation_error& e) {
     json_result["compiler_invocation"] = meta_to_json(e.invocation);

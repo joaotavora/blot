@@ -1,3 +1,9 @@
 #pragma once
 
-inline int inner_fn() { return 2; }
+#include <string>
+
+inline std::string thingy() {
+  return "yoyo!";
+}
+
+inline int inner_fn() { [[maybe_unused]] std::string foo = thingy(); return 2;}
