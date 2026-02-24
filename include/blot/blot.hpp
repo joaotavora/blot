@@ -84,16 +84,21 @@ struct annotation_result {
  * members in @c annotation_result::output point directly into @p input, so
  * @p input must outlive the result.
  *
- * @p target_file names the file whose functions should appear in the output.
- * Only functions that have at least one @c .loc directive referencing this
- * file are emitted; functions from other files (e.g. the @c .cpp translation
- * unit that includes a header) are filtered out.  When @p target_file is
- * @c nullopt the first @c .file entry in the assembly is used instead, which
- * is the correct behaviour when annotating a translation unit directly.
+ * @p annotation_target names the file whose functions should appear
+ * in the output.  If a relative path, @p annotation_target is first
+ * resolved against the current directory.  The systems tries to keep
+ * only functions that have at least one @c .loc directive referencing
+ * this file.  Due to inlining, this may sometimes yield suprising
+ * results.
+ *
+ * When @p annotation_target is @c nullopt the first @c .file entry in
+ * the assembly is used instead, which is the correct behaviour when
+ * annotating a translation unit directly.
  */
 annotation_result annotate(
     std::span<const char> input, const annotation_options& options,
-    const std::optional<std::filesystem::path>& target_file = std::nullopt);
+    const std::optional<std::filesystem::path>& annotation_target =
+        std::nullopt);
 
 /** @brief Return annotated output with symbols demangled.
  *
