@@ -5,10 +5,12 @@
 #include <CLI/CLI.hpp>
 #include <boost/json.hpp>
 #include <boost/json/array.hpp>
+#include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <optional>
 #include <span>
+#include <string>
 #include <type_traits>
 #include <variant>
 
@@ -140,13 +142,13 @@ json::object error_to_json(const std::exception& e) {
 
 int main_nojson(blot::file_options& fopts, blot::annotation_options& aopts) {
   try {
-    std::string input = std::visit(
-        [&](auto&& w) {
+    auto [_directory, input] = std::visit(
+        [&](auto&& w) -> std::pair<fs::path, std::string>{
           using T = std::decay_t<decltype(w)>;
-          if constexpr (std::is_same_v<T, std::string>) {
-            return w;
+          if constexpr (std::is_same_v<T, simple_input>) {
+            return {fs::current_path(), w.assembly};
           } else {
-            return w.assembly;
+            return {w.invocation.directory, w.assembly};
           }
         },
         grab_input(fopts));
