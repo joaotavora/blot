@@ -49,12 +49,8 @@ std::optional<fs::path> find_ccj();
  *
  * @p source_file is matched against the absolute paths of files
  * included by each translation unit, both directly and transitively.
- * If @p source_file is absolute, it is compared as-is.  If it is
- * relative, it is resolved against the directory that contains @p
- * compile_commands_path before matching.  For example, if the current
- * working directory contains @c compile_commands.json and a needle of
- * @c "include/header.hpp" is passed, the effective needle is
- * @c <cwd>/include/header.hpp.
+ * If a relative path, @p source_file is first resolved against the
+ * current directory.
  *
  * Returns the @c compile_command for the first matching translation
  * unit, or an empty optional if no entry in the database includes @p

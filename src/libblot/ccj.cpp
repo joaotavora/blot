@@ -79,8 +79,7 @@ std::optional<compile_command> infer(
 
   fs::path ccj_dir = fs::absolute(compile_commands_path).parent_path();
   auto normpath = [&](const fs::path& p) -> fs::path {
-    if (p.is_absolute()) return p.lexically_normal();
-    return (ccj_dir / p).lexically_normal();
+    return fs::absolute(p).lexically_normal();
   };
 
   // Relative needles are resolved against the ccj file's directory.
