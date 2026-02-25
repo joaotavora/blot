@@ -43,6 +43,13 @@ std::optional<int> parse_options(
       "Path to compile_commands.json file");
   app.add_flag("--json", json_output, "Output results in JSON format")
       ->capture_default_str();
+  app.add_flag("--web", fopts.web_mode, "Start HTTP server with browser UI")
+      ->capture_default_str();
+  app.add_option("--port", fopts.port, "Port for --web mode (default 4242)")
+      ->capture_default_str();
+  app.add_option(
+      "--web-root", fopts.web_root,
+      "Serve static files from DIR instead of embedded HTML (for development)");
   app.add_option("source-file", fopts.src_file_name, "Source file to annotate");
 
   try {

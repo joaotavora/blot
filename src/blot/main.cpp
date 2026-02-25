@@ -14,6 +14,7 @@
 #include <type_traits>
 #include <variant>
 
+#include "../libblot/json_helpers.hpp"
 #include "../libblot/linespan.hpp"
 #include "../libblot/logger.hpp"
 #include "../libblot/utils.hpp"
@@ -21,6 +22,7 @@
 #include "blot/blot.hpp"
 #include "blot/ccj.hpp"
 #include "options.hpp"
+#include "web_server.hpp"
 
 namespace fs = std::filesystem;
 namespace blot = xpto::blot;
@@ -74,17 +76,6 @@ grabbed_input_t grab_input(blot::file_options& fopts) {
   }
 }
 
-json::object aopts_to_json(const blot::annotation_options& aopts) {
-  json::object annotation_options;
-  annotation_options["demangle"] = aopts.demangle;
-  annotation_options["preserve_directives"] = aopts.preserve_directives;
-  annotation_options["preserve_library_functions"] =
-      aopts.preserve_library_functions;
-  annotation_options["preserve_comments"] = aopts.preserve_comments;
-  annotation_options["preserve_unused_labels"] = aopts.preserve_unused_labels;
-  return annotation_options;
-}
-
 json::object fopts_to_json(const blot::file_options& fopts) {
   json::object file_options;
   if (fopts.compile_commands_path)
@@ -99,45 +90,6 @@ json::object fopts_to_json(const blot::file_options& fopts) {
     file_options["source_file"] = nullptr;
 
   return file_options;
-}
-
-json::object meta_to_json(const blot::compiler_invocation& inv) {
-  json::object meta;
-  meta["compiler_version"] = inv.compiler_version;
-  meta["directory"] = inv.directory.c_str();
-  meta["compiler"] = inv.compiler;
-  meta["args"] = json::array(inv.args.begin(), inv.args.end());
-  return meta;
-}
-
-json::object annotate_to_json(
-    std::string_view input, const blot::annotation_options& aopts,
-    const std::optional<fs::path>& target_file = std::nullopt) {
-  json::object res;
-  auto a_result = annotate(input, aopts, target_file);
-  auto output_lines = blot::apply_demanglings(a_result);
-
-  json::array assembly_lines(output_lines.begin(), output_lines.end());
-  json::array line_mappings;
-  for (auto&& [src_line, asm_start, asm_end] : a_result.linemap) {
-    json::object mapping;
-    mapping["source_line"] = src_line;
-    mapping["asm_start"] = asm_start;
-    mapping["asm_end"] = asm_end;
-    line_mappings.push_back(mapping);
-  }
-
-  res["assembly"] = assembly_lines;
-  res["line_mappings"] = line_mappings;
-
-  return res;
-}
-
-json::object error_to_json(const std::exception& e) {
-  json::object res;
-  res["name"] = blot::utils::demangle_symbol(typeid(e).name());
-  res["details"] = e.what();
-  return res;
 }
 
 int main_nojson(blot::file_options& fopts, blot::annotation_options& aopts) {
@@ -176,6 +128,22 @@ int main(int argc, char* argv[]) {
   xpto::logger::set_level(static_cast<xpto::logger::level>(loglevel));
   LOG_DEBUG("loglevel={}", loglevel);
 
+  if (fopts.web_mode) {
+    fs::path ccj_path;
+    if (fopts.compile_commands_path) {
+      ccj_path = *fopts.compile_commands_path;
+    } else {
+      auto ccj = blot::find_ccj();
+      if (!ccj) {
+        std::cerr << "blot --web: can't find compile_commands.json in cwd\n";
+        return 1;
+      }
+      ccj_path = *ccj;
+    }
+    blot::run_web_server(ccj_path, fopts.port);
+    return 0;
+  }
+
   if (!json_output) return main_nojson(fopts, aopts);
 
   // from this point on, JSON stuff
@@ -211,7 +179,7 @@ int main(int argc, char* argv[]) {
     desc["dribble"] = json::array(ls.begin(), ls.end());
     retval = -1;
   } catch (std::exception& e) {
-    json_result["error"] = error_to_json(e);
+    json_result["error"] = blot::error_to_json(e);
     retval = -1;
   }
   std::cout << json::serialize(json_result) << "\n";
