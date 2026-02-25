@@ -1,0 +1,547 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>blot — compiler explorer</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/x86asm.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/vue/3.4.21/vue.global.prod.min.js"></script>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: 'Segoe UI', system-ui, sans-serif;
+  background: #1a1a2e;
+  color: #e0e0e0;
+  height: 100vh;
+  overflow: hidden;
+}
+
+#app {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+
+/* ── Top bar ─────────────────────────────────────────────── */
+.topbar {
+  background: #16213e;
+  border-bottom: 1px solid #0f3460;
+  padding: 8px 14px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-shrink: 0;
+}
+
+.topbar h1 {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #e94560;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+}
+
+.status-badge {
+  font-size: 0.75rem;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: #0f3460;
+  color: #a0c4ff;
+}
+
+.options-bar {
+  display: flex;
+  gap: 12px;
+  margin-left: auto;
+  flex-wrap: wrap;
+}
+
+.opt-label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.8rem;
+  cursor: pointer;
+  user-select: none;
+  color: #b0b8c8;
+}
+
+.opt-label input[type=checkbox] {
+  accent-color: #e94560;
+  cursor: pointer;
+}
+
+/* ── Main layout ─────────────────────────────────────────── */
+.main {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+/* ── File tree ───────────────────────────────────────────── */
+.filetree {
+  width: 220px;
+  min-width: 150px;
+  background: #16213e;
+  border-right: 1px solid #0f3460;
+  overflow-y: auto;
+  flex-shrink: 0;
+  padding: 8px 0;
+}
+
+.filetree-header {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: #607080;
+  padding: 4px 12px 8px;
+}
+
+.filetree-item {
+  padding: 5px 12px;
+  font-size: 0.8rem;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: #9ab0c8;
+  transition: background 0.1s;
+}
+
+.filetree-item:hover { background: #1e3a5f; }
+
+.filetree-item.active {
+  background: #0f3460;
+  color: #e0e8f0;
+  font-weight: 600;
+}
+
+/* ── Editor panels ───────────────────────────────────────── */
+.panels {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+.panel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-right: 1px solid #0f3460;
+}
+
+.panel:last-child { border-right: none; }
+
+.panel-header {
+  background: #16213e;
+  border-bottom: 1px solid #0f3460;
+  padding: 5px 12px;
+  font-size: 0.75rem;
+  color: #607080;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  flex-shrink: 0;
+}
+
+.panel-header span { color: #9ab0c8; }
+
+.panel-body {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: auto;
+}
+
+/* ── Code tables (line numbers + code) ───────────────────── */
+.code-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: 'Fira Code', 'Consolas', monospace;
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
+
+.code-table tr { transition: background 0.05s; }
+
+.line-num {
+  width: 3.5em;
+  text-align: right;
+  padding: 0 8px 0 4px;
+  color: #3d5068;
+  user-select: none;
+  border-right: 1px solid #1e3a5f;
+  vertical-align: top;
+}
+
+.line-code {
+  padding: 0 8px;
+  white-space: pre;
+}
+
+/* Highlight palette: 10 hues, alternating so adjacent regions differ */
+.hl-0  { background: rgba(233, 69,  96,  0.18); }
+.hl-1  { background: rgba( 63,179, 255, 0.18); }
+.hl-2  { background: rgba(255,185,  64, 0.18); }
+.hl-3  { background: rgba(128,255,  64, 0.18); }
+.hl-4  { background: rgba(200, 64, 255, 0.18); }
+.hl-5  { background: rgba( 64,255,185, 0.18); }
+.hl-6  { background: rgba(255,128,  64, 0.18); }
+.hl-7  { background: rgba( 64,128,255, 0.18); }
+.hl-8  { background: rgba(255, 64,128, 0.18); }
+.hl-9  { background: rgba(185,255, 64, 0.18); }
+
+.hl-hover-0  { background: rgba(233, 69,  96,  0.45); }
+.hl-hover-1  { background: rgba( 63,179, 255, 0.45); }
+.hl-hover-2  { background: rgba(255,185,  64, 0.45); }
+.hl-hover-3  { background: rgba(128,255,  64, 0.45); }
+.hl-hover-4  { background: rgba(200, 64, 255, 0.45); }
+.hl-hover-5  { background: rgba( 64,255,185, 0.45); }
+.hl-hover-6  { background: rgba(255,128,  64, 0.45); }
+.hl-hover-7  { background: rgba( 64,128,255, 0.45); }
+.hl-hover-8  { background: rgba(255, 64,128, 0.45); }
+.hl-hover-9  { background: rgba(185,255, 64, 0.45); }
+
+/* ── Misc ─────────────────────────────────────────────────── */
+.loading {
+  padding: 24px;
+  color: #607080;
+  font-size: 0.85rem;
+  text-align: center;
+}
+
+.error-msg {
+  padding: 16px;
+  color: #e94560;
+  font-size: 0.8rem;
+  font-family: monospace;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.compiler-info {
+  padding: 4px 12px;
+  background: #0d1b2e;
+  border-top: 1px solid #0f3460;
+  font-size: 0.72rem;
+  color: #3d5068;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex-shrink: 0;
+}
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- Top bar -->
+  <div class="topbar">
+    <h1>blot</h1>
+    <span class="status-badge" v-if="status">{{ status.tu_count }} TUs &bull; {{ statusRoot }}</span>
+    <span class="status-badge" style="color:#e94560" v-else-if="statusError">no compile_commands.json</span>
+    <div class="options-bar">
+      <label class="opt-label" v-for="(val, key) in opts" :key="key">
+        <input type="checkbox" v-model="opts[key]" @change="reannotate"> {{ optLabel(key) }}
+      </label>
+    </div>
+  </div>
+
+  <!-- Main -->
+  <div class="main">
+
+    <!-- File tree -->
+    <div class="filetree">
+      <div class="filetree-header">Files</div>
+      <div v-if="!files.length" class="loading">loading…</div>
+      <div
+        v-for="f in files" :key="f"
+        class="filetree-item"
+        :class="{active: f === selectedFile}"
+        :title="f"
+        @click="selectFile(f)"
+      >{{ basename(f) }}</div>
+    </div>
+
+    <!-- Source + Assembly panels -->
+    <div class="panels">
+
+      <!-- Source panel -->
+      <div class="panel">
+        <div class="panel-header">Source <span v-if="selectedFile">— {{ basename(selectedFile) }}</span></div>
+        <div class="panel-body" ref="srcPanel">
+          <div v-if="loadingSource" class="loading">loading…</div>
+          <div v-else-if="!sourceLines.length" class="loading">select a file</div>
+          <table class="code-table" v-else>
+            <tbody>
+              <tr
+                v-for="(line, i) in sourceLines"
+                :key="i"
+                :class="srcRowClass(i+1)"
+                @mouseenter="hoveredSourceLine = i+1"
+                @mouseleave="hoveredSourceLine = 0"
+              >
+                <td class="line-num">{{ i+1 }}</td>
+                <td class="line-code" v-html="hlCpp(line)"></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Assembly panel -->
+      <div class="panel">
+        <div class="panel-header">Assembly</div>
+        <div class="panel-body" ref="asmPanel">
+          <div v-if="loadingAsm" class="loading">annotating…</div>
+          <div v-else-if="asmError" class="error-msg">{{ asmError }}</div>
+          <div v-else-if="!asmLines.length" class="loading">select a file</div>
+          <table class="code-table" v-else>
+            <tbody>
+              <tr
+                v-for="(line, i) in asmLines"
+                :key="i"
+                :class="asmRowClass(i+1)"
+                @mouseenter="hoveredAsmLine = i+1"
+                @mouseleave="hoveredAsmLine = 0"
+              >
+                <td class="line-num">{{ i+1 }}</td>
+                <td class="line-code" v-html="hlAsm(line)"></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="compiler-info" v-if="compilerInfo">{{ compilerInfo }}</div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+const { createApp, ref, computed, watch, onMounted } = Vue;
+
+createApp({
+  setup() {
+    // ── State ──────────────────────────────────────────────
+    const status = ref(null);
+    const statusError = ref(false);
+    const files = ref([]);
+    const selectedFile = ref('');
+
+    const sourceLines = ref([]);
+    const loadingSource = ref(false);
+
+    const asmLines = ref([]);
+    const lineMappings = ref([]);  // [{source_line, asm_start, asm_end}]
+    const loadingAsm = ref(false);
+    const asmError = ref('');
+    const compilerInfo = ref('');
+
+    const hoveredSourceLine = ref(0);
+    const hoveredAsmLine = ref(0);
+
+    const opts = ref({
+      demangle: true,
+      preserve_directives: false,
+      preserve_comments: false,
+      preserve_library_functions: false,
+      preserve_unused_labels: false,
+    });
+
+    // ── Computed: highlight maps ───────────────────────────
+    // srcColorMap: source_line → color_index
+    // asmColorMap: asm_line_1based → color_index
+    const srcColorMap = computed(() => {
+      const m = new Map();
+      lineMappings.value.forEach((lm, idx) => {
+        m.set(lm.source_line, idx % 10);
+      });
+      return m;
+    });
+
+    const asmColorMap = computed(() => {
+      const m = new Map();
+      lineMappings.value.forEach((lm, idx) => {
+        for (let l = lm.asm_start; l <= lm.asm_end; l++) {
+          m.set(l, idx % 10);
+        }
+      });
+      return m;
+    });
+
+    // Which source lines are in the hovered asm range?
+    const hoveredSrcLinesFromAsm = computed(() => {
+      if (!hoveredAsmLine.value) return new Set();
+      const s = new Set();
+      for (const lm of lineMappings.value) {
+        if (hoveredAsmLine.value >= lm.asm_start && hoveredAsmLine.value <= lm.asm_end) {
+          s.add(lm.source_line);
+        }
+      }
+      return s;
+    });
+
+    // Which asm lines are in the hovered source range?
+    const hoveredAsmLinesFromSrc = computed(() => {
+      if (!hoveredSourceLine.value) return new Set();
+      const s = new Set();
+      for (const lm of lineMappings.value) {
+        if (lm.source_line === hoveredSourceLine.value) {
+          for (let l = lm.asm_start; l <= lm.asm_end; l++) s.add(l);
+        }
+      }
+      return s;
+    });
+
+    // ── Row class helpers ──────────────────────────────────
+    function srcRowClass(lineNum) {
+      const hover = hoveredSrcLinesFromAsm.value.has(lineNum)
+                 || hoveredSourceLine.value === lineNum;
+      const ci = srcColorMap.value.get(lineNum);
+      if (ci === undefined) return '';
+      return hover ? `hl-hover-${ci}` : `hl-${ci}`;
+    }
+
+    function asmRowClass(lineNum) {
+      const hover = hoveredAsmLinesFromSrc.value.has(lineNum)
+                 || hoveredAsmLine.value === lineNum;
+      const ci = asmColorMap.value.get(lineNum);
+      if (ci === undefined) return '';
+      return hover ? `hl-hover-${ci}` : `hl-${ci}`;
+    }
+
+    // ── Syntax highlighting helpers ────────────────────────
+    function hlCpp(code) {
+      try {
+        return hljs.highlight(code, { language: 'cpp' }).value;
+      } catch { return escHtml(code); }
+    }
+
+    function hlAsm(code) {
+      try {
+        return hljs.highlight(code, { language: 'x86asm' }).value;
+      } catch { return escHtml(code); }
+    }
+
+    function escHtml(s) {
+      return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }
+
+    // ── Helpers ────────────────────────────────────────────
+    function basename(p) {
+      return p.split('/').pop() || p;
+    }
+
+    function optLabel(key) {
+      return key.replace(/_/g,' ');
+    }
+
+    const statusRoot = computed(() => {
+      if (!status.value) return '';
+      const r = status.value.project_root || '';
+      const parts = r.split('/');
+      return parts.slice(-2).join('/') || r;
+    });
+
+    // ── API calls ──────────────────────────────────────────
+    async function fetchStatus() {
+      try {
+        const r = await fetch('/api/status');
+        if (r.ok) status.value = await r.json();
+        else statusError.value = true;
+      } catch { statusError.value = true; }
+    }
+
+    async function fetchFiles() {
+      try {
+        const r = await fetch('/api/files');
+        if (r.ok) {
+          const data = await r.json();
+          files.value = data.files || [];
+        }
+      } catch { /* ignore */ }
+    }
+
+    async function selectFile(f) {
+      selectedFile.value = f;
+      sourceLines.value = [];
+      asmLines.value = [];
+      lineMappings.value = [];
+      asmError.value = '';
+      compilerInfo.value = '';
+
+      loadingSource.value = true;
+      try {
+        const r = await fetch('/api/source?file=' + encodeURIComponent(f));
+        if (r.ok) {
+          const data = await r.json();
+          sourceLines.value = (data.content || '').split('\n');
+          // trim trailing empty line from split
+          if (sourceLines.value.at(-1) === '') sourceLines.value.pop();
+        }
+      } finally { loadingSource.value = false; }
+
+      annotate(f);
+    }
+
+    async function annotate(file) {
+      if (!file) return;
+      loadingAsm.value = true;
+      asmError.value = '';
+      asmLines.value = [];
+      lineMappings.value = [];
+      compilerInfo.value = '';
+      try {
+        const r = await fetch('/api/annotate', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ file, options: opts.value }),
+        });
+        const data = await r.json();
+        if (data.error) {
+          asmError.value = data.error.details || JSON.stringify(data.error);
+          if (data.error.dribble) asmError.value += '\n' + data.error.dribble.join('\n');
+        } else {
+          asmLines.value = data.assembly || [];
+          lineMappings.value = data.line_mappings || [];
+          if (data.compiler_invocation) {
+            const ci = data.compiler_invocation;
+            compilerInfo.value = `${ci.compiler}  ${ci.compiler_version}`;
+          }
+        }
+      } catch (e) {
+        asmError.value = String(e);
+      } finally { loadingAsm.value = false; }
+    }
+
+    function reannotate() {
+      if (selectedFile.value) annotate(selectedFile.value);
+    }
+
+    // ── Init ───────────────────────────────────────────────
+    onMounted(async () => {
+      await fetchStatus();
+      await fetchFiles();
+    });
+
+    return {
+      status, statusError, statusRoot,
+      files, selectedFile,
+      sourceLines, loadingSource,
+      asmLines, lineMappings, loadingAsm, asmError, compilerInfo,
+      hoveredSourceLine, hoveredAsmLine,
+      opts,
+      srcRowClass, asmRowClass,
+      hlCpp, hlAsm,
+      basename, optLabel,
+      selectFile, reannotate,
+    };
+  }
+}).mount('#app');
+</script>
+</body>
+</html>

@@ -144,7 +144,7 @@ handling, `libclang` for C++/C parsing, `doctest` for tests)
 
   A JSONRPC 2.0 server proof-of-concept (`src/jsonrpc_server/`) is
   implemented, using LSP-style `Content-Length` framing over
-  stdin/stdout.  It currently exposes `blot/annotate` and will serve
+  stdin/stdout.  It currently exposes `blot/annotate` and could serve
   as the backbone for editor plugins and project-explorer tools.
 
 * *20%* Decent-ish C/C++ stable API and ABI.  The so-called
