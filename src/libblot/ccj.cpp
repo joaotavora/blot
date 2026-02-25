@@ -5,6 +5,7 @@
 #include <clang/Basic/FileSystemOptions.h>
 #include <clang/Frontend/CompilerInstance.h>
 #include <clang/Frontend/FrontendActions.h>
+#include <clang/Lex/HeaderSearch.h>
 #include <clang/Lex/PPCallbacks.h>
 #include <clang/Lex/Preprocessor.h>
 #include <clang/Tooling/JSONCompilationDatabase.h>
@@ -14,6 +15,7 @@
 #include <filesystem>
 #include <optional>
 #include <string>
+#include <unordered_set>
 
 #include "logger.hpp"
 #include "utils.hpp"
@@ -39,27 +41,55 @@ class find_action : public clang::PreprocessOnlyAction {
         clang::SourceLocation, const clang::Token&, llvm::StringRef, bool,
         clang::CharSourceRange, clang::OptionalFileEntryRef file,
         llvm::StringRef, llvm::StringRef, const clang::Module*, bool,
-        clang::SrcMgr::CharacteristicKind) override {
+        clang::SrcMgr::CharacteristicKind kind) override {
       if (!file || action->match_) return;
       fs::path raw{std::string{file->getName()}};
       fs::path path = (action->working_dir_ / raw).lexically_normal();
 
-      LOG_TRACE("     saw includee '{}' -> abs '{}'", file->getName(), path);
-      if (path == action->needle_) action->match_ = true;
+      LOG_TRACE(
+          "        saw includee '{}' ({})", path,
+          kind == clang::SrcMgr::C_User ? "user" : "system");
+      if (path == action->needle_) {
+        action->match_ = true;
+        return;
+      }
+      // Remember any headers seen so further TUs can skip
+      // re-processing them entirely.  Restrict this to system
+      // headers.
+      if (kind != clang::SrcMgr::C_User)
+        action->dead_files_.insert(path.string());
     }
   };
 
  public:
-  find_action(const fs::path& needle, const fs::path& working_dir, bool& match)
-      : needle_{needle}, working_dir_{working_dir}, match_{match} {}
+  using dead_set_t = std::unordered_set<std::string>;
 
-  bool BeginSourceFileAction(clang::CompilerInstance& ci) override {
-    ci.getPreprocessor().addPPCallbacks(std::make_unique<finder>(this));
-    return true;
-  }
+  find_action(
+      const fs::path& needle, const fs::path& working_dir, bool& match,
+      dead_set_t& dead_files)
+      : needle_{needle},
+        working_dir_{working_dir},
+        match_{match},
+        dead_files_{dead_files} {}
 
   void ExecuteAction() override {
-    clang::Preprocessor& pp = getCompilerInstance().getPreprocessor();
+    auto& ci = getCompilerInstance();
+    auto& pp = ci.getPreprocessor();
+    auto& hs = pp.getHeaderSearchInfo();
+    auto& fm = ci.getFileManager();
+
+    ci.getPreprocessor().addPPCallbacks(std::make_unique<finder>(this));
+
+    // Pre-mark all known-dead system headers as pragma-once so the
+    // preprocessor skips them (and their transitive includes) entirely.
+    LOG_TRACE("Marking {} \"dead\" files pragma-once", dead_files_.size());
+    for (const auto& path : dead_files_) {
+      if (auto fe = fm.getOptionalFileRef(path))
+        hs.getFileInfo(*fe).isPragmaOnce = true;
+    }
+
+    // Do more or less the default lexing action, but exit early if a
+    // match is found.  This will call the callback.
     pp.EnterMainSourceFile();
     clang::Token tok{};
     // NOLINTNEXTLINE(*-do-while)
@@ -72,6 +102,7 @@ class find_action : public clang::PreprocessOnlyAction {
   const fs::path& needle_;
   const fs::path& working_dir_;
   bool& match_;
+  dead_set_t& dead_files_;
 };
 
 }  // namespace
@@ -91,6 +122,7 @@ std::optional<compile_command> infer(
   fs::path needle = fs::absolute(source_file).lexically_normal();
 
   clang::IgnoringDiagConsumer silent{};
+  find_action::dead_set_t dead_files{};
   for (auto& cmd : db->getAllCompileCommands()) {
     LOG_DEBUG("OK: Examining entry for '{}'", cmd.Filename);
 
@@ -107,7 +139,8 @@ std::optional<compile_command> infer(
         new clang::FileManager{clang::FileSystemOptions{cmd.Directory}}};
       clang::tooling::ToolInvocation inv{
         cmd.CommandLine,
-        std::make_unique<find_action>(needle, working_dir, match), fm.get()};
+        std::make_unique<find_action>(needle, working_dir, match, dead_files),
+        fm.get()};
       inv.setDiagnosticConsumer(&silent);
       inv.run();
     }
