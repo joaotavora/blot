@@ -91,7 +91,7 @@ The `blot` program will live in `build-Debug/blot` or
 
 There are dependencies (nothing exotic: `RE2` for regexps, `Boost` for
 JSON and Process.V2, `fmtlib` for formatting, `CLI11` for CLI
-handling, `libclang` for C++/C parsing, `doctest` for tests)
+handling, LLVM/Clang C++ libraries for C++/C parsing, `doctest` for tests)
 
 ## Roadmap
 
@@ -118,8 +118,8 @@ handling, `libclang` for C++/C parsing, `doctest` for tests)
 * *95%* Header file annotation
 
   Header files don't appear in `compile_commands.json`, so blot
-  heuristically infers the "includer" translation unit by parsing each
-  entry and walking its full inclusion tree with libclang.
+  heuristically infers the "includer" translation unit by preprocessing
+  each entry and walking its inclusion tree via Clang's `PPCallbacks`.
 
   There is decent test coverage for this, but edge cases remain.  One
   of them has to with code injected by sanitizers (UBSan and ASAN),
@@ -168,8 +168,8 @@ handling, `libclang` for C++/C parsing, `doctest` for tests)
 ## Building with Conan (may be useful later for CI)
 
 If you have Conan 2 installed, you can automatically download and
-build the dependencies (except `libclang` which must be installed
-separately, for now).
+build the dependencies (except the LLVM/Clang libraries which must be
+installed separately, for now).
 
 There are some profiles `conan-dev` and `conan-release` that make use
 of [conan-cmake][1] integration, so no manual `conan install` is
