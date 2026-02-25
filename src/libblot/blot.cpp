@@ -104,7 +104,7 @@ void sweeping(
 const RE2 r_label_start                {R"(^([^:]+): *(?:#|$)(?:.*))"};
 const RE2 r_has_opcode                 {R"(^[[:space:]]+[A-Za-z]+[[:space:]]*)"};
 const RE2 r_comment_only               {R"(^[[:space:]]*(?:[#;@]|//|/\*.*\*/).*$)"};
-const RE2 r_label_reference            {R"(\.[A-Z_a-z][$.0-9A-Z_a-z]*)"};
+const RE2 r_label_reference            {R"(^\.[A-Z_a-z][$.0-9A-Z_a-z]*)"};
 const RE2 r_defines_global             {R"(^[[:space:]]*\.globa?l[[:space:]]*([.A-Z_a-z][$.0-9A-Z_a-z]*))"};
 const RE2 r_defines_function_or_object {R"(^[[:space:]]*\.type[[:space:]]*(.*),[[:space:]]*[%@])"};
 const RE2 r_file_directive             {R"(^[[:space:]]*\.file[[:space:]]+([[:digit:]]+)(?:[[:space:]]+\"([^\"]+)\")?[[:space:]]+\"([^\"]+)\"(?:[[:space:]]+md5[[:space:]]+(0x[[:xdigit:]]+))?.*)"};
