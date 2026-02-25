@@ -1,0 +1,4 @@
+#pragma once
+
+// Configured by CMake — points at the web/ directory in the source tree.
+inline constexpr const char kWebRoot[] = "@WEB_ROOT@";

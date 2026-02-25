@@ -43,13 +43,22 @@ target_link_libraries(blot_lib PUBLIC
 )
 target_compile_definitions(blot_lib PUBLIC LOG_NO_TIMESTAMP)
 
+# Configure web root path into a header so the server can find web/ at runtime
+set(WEB_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/web)
+configure_file(
+    src/blot/web_config.hpp.in
+    ${CMAKE_CURRENT_BINARY_DIR}/web_config.hpp
+    @ONLY
+)
+
 # Main executable
 file(GLOB blot_sources CONFIGURE_DEPENDS src/blot/*.cpp)
 add_executable(blot_exe ${blot_sources})
-target_include_directories(blot_exe PRIVATE include)
+target_include_directories(blot_exe PRIVATE include src/blot ${CMAKE_CURRENT_BINARY_DIR})
 target_link_libraries(blot_exe PRIVATE
   blot_lib
   CLI11::CLI11
+  Boost::headers
 )
 set_target_properties(blot_exe PROPERTIES OUTPUT_NAME blot)
 
