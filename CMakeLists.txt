@@ -21,7 +21,12 @@ find_package(Boost REQUIRED COMPONENTS process json)
 find_package(fmt REQUIRED)
 find_package(CLI11 REQUIRED)
 find_package(doctest REQUIRED)
-find_package(Clang REQUIRED)
+
+# LLVM hasn't done its homework.  Need to find these two dynlibs
+# explicitly.  Clang theoretically should pull in the other but
+# because of some archlinux thing we have to pull them individually.
+find_library(CLANG_CPP clang-cpp REQUIRED)
+find_library(LLVM LLVM REQUIRED)
 
 # Core blot library
 file(GLOB lib_sources CONFIGURE_DEPENDS src/libblot/*.cpp)
@@ -33,7 +38,8 @@ target_link_libraries(blot_lib PUBLIC
   Boost::process
   Boost::json
   fmt::fmt
-  libclang
+  ${CLANG_CPP}
+  ${LLVM}
 )
 target_compile_definitions(blot_lib PUBLIC LOG_NO_TIMESTAMP)
 

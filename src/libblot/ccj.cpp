@@ -1,34 +1,26 @@
 #include "blot/ccj.hpp"
 
-#include <clang-c/Index.h>
+#include <clang/Basic/Diagnostic.h>
+#include <clang/Basic/FileManager.h>
+#include <clang/Basic/FileSystemOptions.h>
+#include <clang/Frontend/CompilerInstance.h>
+#include <clang/Frontend/FrontendActions.h>
+#include <clang/Lex/PPCallbacks.h>
+#include <clang/Lex/Preprocessor.h>
+#include <clang/Tooling/JSONCompilationDatabase.h>
+#include <clang/Tooling/Tooling.h>
 #include <fmt/std.h>
 
-#include <boost/filesystem.hpp>
-#include <boost/json.hpp>
-#include <boost/system/system_error.hpp>
 #include <filesystem>
-#include <fstream>
 #include <optional>
-#include <sstream>
 #include <string>
-#include <vector>
 
-#include "auto.hpp"
 #include "logger.hpp"
 #include "utils.hpp"
 
 namespace xpto::blot {
 
 namespace fs = std::filesystem;
-namespace json = boost::json;
-namespace bs = boost::system;
-
-// Helper function to parse compile_commands.json
-json::array parse_ccj(const fs::path& compile_commands_path) {
-  std::ifstream is{compile_commands_path.string()};
-  if (!is) utils::throwf("Can't parse {}", compile_commands_path);
-  return json::parse(is).as_array();
-}
 
 std::optional<fs::path> find_ccj() {
   auto probe = fs::current_path() / "compile_commands.json";
@@ -36,38 +28,53 @@ std::optional<fs::path> find_ccj() {
   return std::nullopt;
 }
 
-// Helper function to create a translation unit from a file and its compile
-// command
-CXTranslationUnit create_translation_unit(
-    CXIndex index, const fs::path& file_path, const std::string& command) {
-  std::vector<std::string> args;
-  std::vector<const char*> argv;
-  std::istringstream iss(command);
-  std::string token;
+namespace {
 
-  // Skip the compiler executable name
-  iss >> token;
+class find_action : public clang::PreprocessOnlyAction {
+  struct finder : clang::PPCallbacks {
+    find_action* action;
+    finder(find_action* a) : action{a} {}
 
-  // Collect arguments until we hit compilation output flags
-  // FIXME: In theory, include directories can come after -c and -o flags,
-  // but libclang doesn't seem to handle this correctly. We may need to parse
-  // the entire command and reorder arguments appropriately in the future.
-  while (iss >> token) {
-    if (token == "-o" || token == "-c") {
-      break;
+    void InclusionDirective(
+        clang::SourceLocation, const clang::Token&, llvm::StringRef, bool,
+        clang::CharSourceRange, clang::OptionalFileEntryRef file,
+        llvm::StringRef, llvm::StringRef, const clang::Module*, bool,
+        clang::SrcMgr::CharacteristicKind) override {
+      if (!file || action->match_) return;
+      fs::path raw{std::string{file->getName()}};
+      fs::path path = (action->working_dir_ / raw).lexically_normal();
+
+      LOG_TRACE("     saw includee '{}' -> abs '{}'", file->getName(), path);
+      if (path == action->needle_) action->match_ = true;
     }
-    args.push_back(token);
+  };
+
+ public:
+  find_action(const fs::path& needle, const fs::path& working_dir, bool& match)
+      : needle_{needle}, working_dir_{working_dir}, match_{match} {}
+
+  bool BeginSourceFileAction(clang::CompilerInstance& ci) override {
+    ci.getPreprocessor().addPPCallbacks(std::make_unique<finder>(this));
+    return true;
   }
 
-  argv.reserve(args.size());
-  for (const auto& arg : args) {
-    argv.push_back(arg.data());
+  void ExecuteAction() override {
+    clang::Preprocessor& pp = getCompilerInstance().getPreprocessor();
+    pp.EnterMainSourceFile();
+    clang::Token tok{};
+    // NOLINTNEXTLINE(*-do-while)
+    do {
+      pp.Lex(tok);
+    } while (!match_ && tok.isNot(clang::tok::eof));
   }
 
-  return clang_parseTranslationUnit(
-      index, file_path.c_str(), argv.data(), static_cast<int>(argv.size()),
-      nullptr, 0, CXTranslationUnit_None);
-}
+ private:
+  const fs::path& needle_;
+  const fs::path& working_dir_;
+  bool& match_;
+};
+
+}  // namespace
 
 std::optional<compile_command> infer(
     const fs::path& compile_commands_path, const fs::path& source_file) {
@@ -75,74 +82,50 @@ std::optional<compile_command> infer(
       "Searching TU's including '{}' in '{}'", source_file,
       compile_commands_path);
 
-  auto entries = parse_ccj(compile_commands_path);
+  std::string err;
+  auto db = clang::tooling::JSONCompilationDatabase::loadFromFile(
+      fs::absolute(compile_commands_path).string(), err,
+      clang::tooling::JSONCommandLineSyntax::AutoDetect);
+  if (!db) utils::throwf("Can't load {}: {}", compile_commands_path, err);
 
-  fs::path ccj_dir = fs::absolute(compile_commands_path).parent_path();
-  auto normpath = [&](const fs::path& p) -> fs::path {
-    return fs::absolute(p).lexically_normal();
-  };
+  fs::path needle = fs::absolute(source_file).lexically_normal();
 
-  // Relative needles are resolved against the ccj file's directory.
-  fs::path needle = normpath(source_file);
+  clang::IgnoringDiagConsumer silent{};
+  for (auto& cmd : db->getAllCompileCommands()) {
+    LOG_DEBUG("OK: Examining entry for '{}'", cmd.Filename);
 
-  struct context_s {
-    const fs::path* needle{};
-    bool match{};
-  } context{&needle, false};
+    fs::path working_dir = fs::absolute(cmd.Directory).lexically_normal();
+    fs::path tu_file =
+        (working_dir / fs::path{cmd.Filename}).lexically_normal();
 
-  // Change to the ccj directory before creating the index so that libclang
-  // resolves relative paths (e.g. -I flags) against the right base.
-  fs::path saved_cwd = fs::current_path();
-  AUTO(fs::current_path(saved_cwd));
-  fs::current_path(ccj_dir);
+    // PPCallbacks::InclusionDirective doesn't fire for the TU itself, so
+    // handle that case directly before invoking the preprocessor.
+    bool match = (tu_file == needle);
 
-  // Create clang index
-  CXIndex index = clang_createIndex(0, 0);
-  AUTO(clang_disposeIndex(index));
+    if (!match) {
+      llvm::IntrusiveRefCntPtr<clang::FileManager> fm{
+        new clang::FileManager{clang::FileSystemOptions{cmd.Directory}}};
+      clang::tooling::ToolInvocation inv{
+        cmd.CommandLine,
+        std::make_unique<find_action>(needle, working_dir, match), fm.get()};
+      inv.setDiagnosticConsumer(&silent);
+      inv.run();
+    }
 
-  // Process each .cpp file
-  for (auto&& entry : entries) {
-    auto& obj = entry.as_object();
-
-    // Parse command arguments and create translation unit
-    std::string command{obj["command"].as_string().c_str()};
-
-    fs::path file{obj["file"].as_string().c_str()};
-    fs::path dir{obj["directory"].as_string().c_str()};
-    fs::path full = normpath(dir / file);
-
-    CXTranslationUnit unit = create_translation_unit(index, full, command);
-    AUTO(clang_disposeTranslationUnit(unit));
-
-    if (!unit) continue;  // failure to parse ¯\_(ツ)_/¯
-    LOG_DEBUG("OK: Examining entry for '{}'", obj["file"].as_string().c_str());
-    context.match = false;
-    clang_getInclusions(
-        unit,
-        [](CXFile included_file, CXSourceLocation*, unsigned,
-           CXClientData cookie) {
-          auto* context = static_cast<context_s*>(cookie);
-          if (context->match) return;
-
-          CXString filename = clang_getFileName(included_file);
-          AUTO(clang_disposeString(filename));
-          fs::path includee = clang_getCString(filename);
-          LOG_DEBUG("   OK: Saw this includee '{}'", includee);
-
-          if (fs::absolute(includee).lexically_normal() == *context->needle) {
-            context->match = true;
-          }
-        },
-        &context);
-
-    if (context.match) {
-      LOG_INFO("SUCCESS: Found '{}', TU includer of '{}'", file, source_file);
+    if (match) {
+      fs::path file = fs::absolute(fs::path{cmd.Directory} / cmd.Filename)
+                          .lexically_normal();
+      std::string command;
+      for (const auto& arg : cmd.CommandLine) {
+        if (!command.empty()) command += ' ';
+        command += arg;
+      }
+      LOG_INFO(
+          "SUCCESS: Found '{}', TU includer of '{}'", cmd.Filename,
+          source_file);
       LOG_INFO("SUCCESS: Using compilation command '{}'", command);
       return compile_command{
-        .directory = normpath(dir),
-        .command = command,
-        .file = normpath(file),
-      };
+        .directory = working_dir, .command = command, .file = file};
     }
   }
   return std::nullopt;
