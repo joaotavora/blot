@@ -274,3 +274,39 @@ TEST_CASE("api_clang_deep_hierarchy_2_inner") {
   CHECK(found_inner);
   CHECK(!found_outer);
 }
+
+TEST_CASE("api_gcc_header_woes") {
+  // Annotating header1.hpp: functions that inline count_positives (from
+  // header1) should appear, but their unrelated callees should not.
+  fs::path fixture = fs::path{TEST_FIXTURE_DIR} / "gcc-header-woes";
+  fs::current_path(fixture);
+
+  auto cmd = xpto::blot::infer("compile_commands.json", "header1.hpp");
+  REQUIRE(cmd.has_value());
+  auto c_result = xpto::blot::get_asm(*cmd);
+
+  auto a_result =
+      xpto::blot::annotate(c_result.assembly, {}, fs::path{"header1.hpp"});
+  auto lines = xpto::blot::apply_demanglings(a_result);
+
+  bool found_process{false};
+  bool found_source_tmpl{false};
+  bool found_source_helper{false};
+  bool found_fixture_throwf{false};
+  bool found_double_it{false};
+  for (auto& l : lines) {
+    if (is_label_with(l, "process")) found_process = true;
+    if (is_label_with(l, "source_tmpl")) found_source_tmpl = true;
+    if (is_label_with(l, "source_helper")) found_source_helper = true;
+    if (is_label_with(l, "fixture_throwf")) found_fixture_throwf = true;
+    if (is_label_with(l, "double_it")) found_double_it = true;
+  }
+  // process() and source_tmpl() both inline count_positives, so they
+  // reference header1.hpp and should appear in the annotation output.
+  CHECK(found_process);
+  CHECK(found_source_tmpl);
+  // Callees unrelated to header1.hpp must not appear.
+  CHECK(!found_source_helper);
+  CHECK(!found_fixture_throwf);
+  CHECK(!found_double_it);
+}
