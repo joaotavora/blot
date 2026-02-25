@@ -35,7 +35,7 @@ target_link_libraries(blot_lib PUBLIC
   fmt::fmt
   libclang
 )
-target_compile_definitions(blot_lib PUBLIC LOG_NO_TIMESTAMP ON)
+target_compile_definitions(blot_lib PUBLIC LOG_NO_TIMESTAMP)
 
 # Main executable
 file(GLOB blot_sources CONFIGURE_DEPENDS src/blot/*.cpp)
