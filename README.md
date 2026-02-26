@@ -3,18 +3,17 @@
 A Compiler Explorer clone, but works with your toolchain and your
 project.
 
-Somewhat embryonic for now, and only for C/C++.  But the goals is for
-this to be a building block in :
+Somewhat embryonic for now, and only for C/C++.  But the goal is for
+this to be a building block in:
 
 * **source code editor plugins** (either as a linked-in library or as
   a subprocess) to get live disassembly of your sources as you edit
   your code in your project.
 
-  Not unlike the Emacs plugin https://github.com/joaotavora/beardbolt,
-  but much faster and more powerful.
+  Not unlike the Emacs [Beardbolt][beardbolt] plugin but much faster
+  and more powerful.
 
-  In fact this Vim plugin is already using blot!
-  https://github.com/adromanov/vim-blot
+  In fact this [Vim plugin][vim-blot] is already using blot!
 
 * **project exploration tools** (for example part of a code forge)
 
@@ -62,6 +61,16 @@ Blot can:
 Add `--json` for structured output with line mappings (beware format may change!)
 Add `--demangle` for demangled output (this should probably be on by default)
 
+3. Launch a local web UI (horribly alpha, use at your own risk):
+
+   ```bash
+   blot --web --ccj path/to/proj/compile_commands.json
+   # then open http://localhost:4242
+   ```
+
+   The default port is 4242; override with `--port N`.  The server
+   stays running until you press Ctrl-C.
+
 ## Build
 
 For now, you'll have to build it yourself with a somewhat modern C++
@@ -90,8 +99,9 @@ The `blot` program will live in `build-Debug/blot` or
 `build-Release/blot`.
 
 There are dependencies (nothing exotic: `RE2` for regexps, `Boost` for
-JSON and Process.V2, `fmtlib` for formatting, `CLI11` for CLI
-handling, LLVM/Clang C++ libraries for C++/C parsing, `doctest` for tests)
+JSON, Process.V2, and "Beast", `fmtlib` for formatting, `CLI11` for
+CLI handling, LLVM/Clang C++ libraries for C++/C parsing, `doctest`
+for tests)
 
 ## Roadmap
 
@@ -100,7 +110,7 @@ handling, LLVM/Clang C++ libraries for C++/C parsing, `doctest` for tests)
 * *90%* Test coverage
 
   Achieve some kind of parity with Compiler Explorer filtering options
-  (filter directives, library functions, etc).  The final 10% is I
+  (filter directives, library functions, etc).  The final 10% is that I
   need to go over the Compiler Explorer options one by one to check if
   it really makes sense.
 
@@ -122,13 +132,13 @@ handling, LLVM/Clang C++ libraries for C++/C parsing, `doctest` for tests)
   each entry and walking its inclusion tree via Clang's `PPCallbacks`.
 
   There is decent test coverage for this, but edge cases remain.  One
-  of them has to with code injected by sanitizers (UBSan and ASAN),
-  which makes for a very noisy annotation results.  The other has to
+  of them has to do with code injected by sanitizers (UBSan and ASAN),
+  which makes for very noisy annotation results.  The other has to
   do with inlining.  In higher optimization settings, the functions
   that inline the header's code are often not in the header file
-  itself, but rahter in the inferred includer.  What to do?  If we
+  itself, but rather in the inferred includer.  What to do?  If we
   show the includer function we'll be more accurate but likely we'll
-  also show _all_ its callees that have nothing to with the annotation
+  also show _all_ its callees that have nothing to do with the annotation
   target.  Or we could push a -fno-inline...
 
 * *80%* Unsaved buffer support
@@ -140,15 +150,23 @@ handling, LLVM/Clang C++ libraries for C++/C parsing, `doctest` for tests)
   The remaining work is wiring it into the full compilation and
   JSONRPC pipeline.
 
-* *20%* Editor tooling and project explorer
+* *30%* Web UI (`--web`)
 
-  A JSONRPC 2.0 server proof-of-concept (`src/jsonrpc_server/`) is
-  implemented, using LSP-style `Content-Length` framing over
-  stdin/stdout.  It currently exposes `blot/annotate` and could serve
-  as the backbone for editor plugins and project-explorer tools.
+  A browser-based project explorer (`blot --web`) is implemented but
+  very rough.  It serves a Vue 3 single-page app backed by a
+  JSONRPC/WebSocket server.  Many things are missing.  The
+  highlighting is horribly slow for one.
+
+* *20%* Editor tooling
+
+  A JSONRPC/stdio server proof-of-concept (`src/jsonrpc_server/`) is
+  implemented.  The API methods it currently exposes are bunk though.
+  It should serve the same API as the Web UI and be integrated into
+  `blot --stdio` one day, so we can build an Emacs extension that is a
+  cross between [Eglot][eglot] and [Beardbolt][beardbolt].
 
 * *20%* Decent-ish C/C++ stable API and ABI.  The so-called
-  "hourglass" pattern might come handy
+  "hourglass" pattern might come in handy
 
 * *90%* Package management
 
@@ -164,6 +182,10 @@ handling, LLVM/Clang C++ libraries for C++/C parsing, `doctest` for tests)
   The main challenge is that test fixtures encode exact compiler
   output, so CI would need pinned compiler versions to avoid
   spurious failures.
+
+* 0% Packaging
+
+  Oh boy, not looking forward to this one.
 
 ## Building with Conan (may be useful later for CI)
 
@@ -190,5 +212,7 @@ needed - CMake will automatically invoke Conan during configuration.
    ```
 
 [1]: https://github.com/conan-io/cmake-conan/tree/develop2
-
+[beardbolt]: https://github.com/joaotavora/beardbolt
+[eglot]: https://github.com/joaotavora/eglot
+[vim-blot]: https://github.com/adromanov/vim-blot
 
