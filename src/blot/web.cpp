@@ -1,38 +1,55 @@
 #include <sys/socket.h>
 #include <unistd.h>
 
+#include <atomic>
+#define BOOST_ASIO_NO_DEPRECATED
+#include <fmt/core.h>
+
+#include <boost/asio/ip/tcp.hpp>
 #include <boost/beast/core.hpp>
 #include <boost/beast/http.hpp>
+#include <boost/beast/websocket.hpp>
 #include <boost/json.hpp>
 #include <filesystem>
 #include <fstream>
-#include <mutex>
+#include <iostream>
 #include <sstream>
 #include <string>
 #include <string_view>
+#include <thread>
+#include <vector>
 
-#include "../libblot/json_helpers.hpp"
-#include "../libblot/linespan.hpp"
 #include "../libblot/logger.hpp"
-#include "blot/assembly.hpp"
-#include "blot/blot.hpp"
-#include "blot/ccj.hpp"
+#include "session.hpp"
 #include "web_config.hpp"
 #include "web_server.hpp"
 
 namespace beast = boost::beast;
 namespace http = beast::http;
 namespace json = boost::json;
+namespace websocket = beast::websocket;
+namespace net = boost::asio;
+using tcp = net::ip::tcp;
 
 namespace xpto::blot {
 
 namespace fs = std::filesystem;
 
-// Serialize all annotate calls (libclang is not thread-safe).
-static std::mutex
-    g_annotate_mutex;  // NOLINT(cppcoreguidelines-avoid-non-const-global-variables)
+struct ws_session : session<ws_session> {
+  using stream_t = beast::websocket::stream<beast::tcp_stream>;
+  ws_session(
+      stream_t& ws, const fs::path& ccj_path, const fs::path& project_root)
+      : ws{&ws}, session{ccj_path, project_root} {}
+  void send(const json::object& msg) {
+    beast::error_code ec{};
+    auto text = json::serialize(msg);
+    ws->write(boost::asio::buffer(text), ec);
+    if (ec) LOG_INFO("ws_send error: {}", ec.message());
+  }
+  stream_t* ws;  // NOLINT
+};
 
-// ── Helpers ───────────────────────────────────────────────────────────────
+/// Helpers
 
 static http::response<http::string_body> make_json_response(
     http::status status_code, const json::value& body,
@@ -70,7 +87,7 @@ static std::vector<std::string> list_source_files(const fs::path& root) {
   return result;
 }
 
-// ── Request dispatch ──────────────────────────────────────────────────────
+/// Request dispatch
 
 template <typename Body, typename Allocator>
 static http::response<http::string_body> dispatch(
@@ -207,87 +224,83 @@ static http::response<http::string_body> dispatch(
     return make_json_response(http::status::ok, obj, version, keep_alive);
   }
 
-  // ── POST /api/annotate ───────────────────────────────────
-  if (req.method() == http::verb::post && target == "/api/annotate") {
-    std::error_code ec;
-    auto body_val = json::parse(req.body(), ec);
-    if (ec)
-      return make_error(
-          http::status::bad_request, "invalid JSON body", version, keep_alive);
-
-    auto& body_obj = body_val.as_object();
-    if (!body_obj.contains("file"))
-      return make_error(
-          http::status::bad_request, "missing 'file'", version, keep_alive);
-
-    std::string file_str{body_obj.at("file").as_string()};
-
-    annotation_options aopts{};
-    if (body_obj.contains("options")) {
-      auto& opts = body_obj.at("options").as_object();
-      auto get_bool = [&](std::string_view key, bool& dst) {
-        if (opts.contains(key)) {
-          if (auto* b = opts.at(key).if_bool()) dst = *b;
-        }
-      };
-      get_bool("demangle", aopts.demangle);
-      get_bool("preserve_directives", aopts.preserve_directives);
-      get_bool("preserve_comments", aopts.preserve_comments);
-      get_bool("preserve_library_functions", aopts.preserve_library_functions);
-      get_bool("preserve_unused_labels", aopts.preserve_unused_labels);
-    }
-
-    // Path traversal check
-    fs::path src_path = fs::weakly_canonical(project_root / file_str, ec);
-    if (ec || src_path.string().find(project_root.string()) != 0)
-      return make_error(
-          http::status::forbidden, "path traversal denied", version,
-          keep_alive);
-
-    json::object result;
-    result["file"] = file_str;
-    result["annotation_options"] = aopts_to_json(aopts);
-
-    LOG_INFO("annotate: {}", src_path.string());
-    std::lock_guard<std::mutex> lock{g_annotate_mutex};
-    try {
-      auto cmd = infer(ccj_path, src_path);
-      if (!cmd) {
-        LOG_INFO("annotate: no CCJ entry for {}", src_path.string());
-        json::object err;
-        err["name"] = "not_found";
-        err["details"] = "No compile_commands.json entry found for this file";
-        result["error"] = err;
-        return make_json_response(
-            http::status::ok, result, version, keep_alive);
-      }
-      LOG_INFO("annotate: compiling with {}", cmd->command);
-      auto c_result = get_asm(*cmd);
-      LOG_INFO(
-          "annotate: annotating {} bytes of assembly",
-          c_result.assembly.size());
-      result["compiler_invocation"] = meta_to_json(c_result.invocation);
-      auto annotation = annotate_to_json(c_result.assembly, aopts, src_path);
-      result.insert(annotation.begin(), annotation.end());
-      LOG_INFO("annotate: done");
-    } catch (compilation_error& e) {
-      result["compiler_invocation"] = meta_to_json(e.invocation);
-      result["error"] = error_to_json(e);
-      auto& desc = result["error"].as_object();
-      xpto::linespan ls{e.dribble};
-      desc["dribble"] = json::array(ls.begin(), ls.end());
-    } catch (std::exception& e) {
-      result["error"] = error_to_json(e);
-    }
-    return make_json_response(http::status::ok, result, version, keep_alive);
-  }
-
   return make_error(http::status::not_found, "not found", version, keep_alive);
 }
 
-// ── Connection handler ────────────────────────────────────────────────────
+/// WebSocket session
 
-void handle_connection(
+bool session_handle_frame(ws_session& sess, std::string_view text) {
+  json::value msg_val{};
+  {
+    std::error_code jec{};
+    msg_val = json::parse(text, jec);
+    if (jec) {
+      sess.send(make_jsonrpc_error(nullptr, -32700, "Parse error"));
+      return true;
+    }
+  }
+
+  auto* msg = msg_val.if_object();
+  if (!msg) {
+    sess.send(make_jsonrpc_error(nullptr, -32600, "Invalid Request"));
+    return true;
+  }
+
+  json::value id{nullptr};
+  if (msg->contains("id")) id = msg->at("id");
+
+  if (!msg->contains("method")) {
+    sess.send(make_jsonrpc_error(id, -32600, "missing method"));
+    return true;
+  }
+
+  std::string method{msg->at("method").as_string()};
+  const json::object* params_ptr{nullptr};
+  if (msg->contains("params")) {
+    params_ptr = msg->at("params").if_object();
+  }
+  json::object empty_params{};
+  const json::object& params = params_ptr ? *params_ptr : empty_params;
+
+  LOG_INFO("ws rpc: {}", method);
+
+  if (method == "initialize") {
+    sess.handle_initialize(id, params);
+  } else if (method == "blot/infer") {
+    sess.handle_infer(id, params);
+  } else if (method == "blot/grab_asm") {
+    sess.handle_grabasm(id, params);
+  } else if (method == "blot/annotate") {
+    sess.handle_annotate(id, params);
+  } else if (method == "shutdown") {
+    json::object result{};
+    sess.send(make_result(id, std::move(result)));
+    return false;
+  } else {
+    sess.send(make_jsonrpc_error(id, -32601, "Method not found"));
+  }
+  return true;
+}
+
+static void run_ws_session(
+    websocket::stream<beast::tcp_stream> ws, const fs::path& ccj_path,
+    const fs::path& project_root) {
+  beast::error_code ec{};
+  ws.text(true);
+  ws_session sess{ws, ccj_path, project_root};
+  for (;;) {
+    beast::flat_buffer buf{};
+    ws.read(buf, ec);
+    if (ec == websocket::error::closed || ec) break;
+    if (!session_handle_frame(sess, beast::buffers_to_string(buf.data())))
+      break;
+  }
+  LOG_INFO("ws session ended");
+}
+
+/// Connection handler
+
+static void handle_connection(
     int socket_fd, const fs::path& ccj_path, const fs::path& project_root) {
   // Each worker thread owns its own io_context for purely synchronous use.
   boost::asio::io_context ioc;
@@ -308,6 +321,19 @@ void handle_connection(
     if (ec == http::error::end_of_stream || ec) break;
 
     LOG_INFO("{} {}", req.method_string(), req.target());
+
+    // ── WebSocket upgrade ─────────────────────────────────
+    if (websocket::is_upgrade(req) && req.target() == "/ws") {
+      websocket::stream<beast::tcp_stream> ws{std::move(stream)};
+      beast::error_code wec;
+      ws.accept(req, wec);
+      if (!wec) {
+        LOG_INFO("ws session started");
+        run_ws_session(std::move(ws), ccj_path, project_root);
+      }
+      return;  // skip shutdown below
+    }
+
     auto res = dispatch(req, ccj_path, project_root);
     LOG_INFO("→ {}", static_cast<unsigned>(res.result_int()));
     http::write(stream, res, ec);
@@ -315,6 +341,58 @@ void handle_connection(
   }
 
   stream.socket().shutdown(boost::asio::ip::tcp::socket::shutdown_send, ec);
+}
+
+/// Server loop
+
+void run_web_server(const fs::path& ccj_path, int port) {
+  fs::path project_root = fs::absolute(ccj_path).parent_path();
+
+  fmt::println("blot --web: listening on http://localhost:{}", port);
+  fmt::println("  project root : {}", project_root.string());
+  fmt::println("  ccj          : {}", ccj_path.string());
+  fmt::println("  press Ctrl-C to stop");
+  std::cout.flush();
+
+  net::io_context ioc;
+  tcp::acceptor acceptor{
+    ioc, tcp::endpoint{tcp::v4(), static_cast<unsigned short>(port)}};
+  acceptor.set_option(net::socket_base::reuse_address{true});
+
+  // Cap the live thread count to avoid unbounded growth.
+  constexpr int kMaxThreads{4};
+  std::atomic<int> active{0};
+  std::vector<std::thread> threads;
+  threads.reserve(64);
+
+  for (;;) {
+    tcp::socket socket{ioc};
+    boost::system::error_code ec;
+    acceptor.accept(socket, ec);
+    if (ec) break;  // acceptor was closed (e.g. signal)
+
+    // Simple back-pressure: spin until a slot opens.
+    while (active.load() >= kMaxThreads) {
+      std::this_thread::sleep_for(std::chrono::milliseconds{5});
+    }
+
+    boost::system::error_code ec2;
+    auto remote = socket.remote_endpoint(ec2);
+    LOG_INFO(
+        "connection from {}:{}", ec2 ? "?" : remote.address().to_string(),
+        ec2 ? 0 : remote.port());
+    ++active;
+    // Transfer socket ownership into the thread via native handle.
+    int fd = socket.release();
+    threads.emplace_back([fd, &ccj_path, &project_root, &active]() {
+      handle_connection(fd, ccj_path, project_root);
+      --active;
+    });
+  }
+
+  for (auto& t : threads) {
+    if (t.joinable()) t.join();
+  }
 }
 
 }  // namespace xpto::blot

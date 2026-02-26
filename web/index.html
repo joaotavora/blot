@@ -205,6 +205,37 @@ body {
 .hl-hover-8  { background: rgba(255, 64,128, 0.45); }
 .hl-hover-9  { background: rgba(185,255, 64, 0.45); }
 
+/* ── Phase progress strip ─────────────────────────────────── */
+.phase-strip {
+  display: flex;
+  gap: 6px;
+  padding: 4px 12px;
+  background: #0d1b2e;
+  border-bottom: 1px solid #0f3460;
+  flex-shrink: 0;
+  align-items: center;
+}
+
+.phase-badge {
+  font-size: 0.7rem;
+  font-family: 'Fira Code', 'Consolas', monospace;
+  padding: 2px 8px;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  white-space: nowrap;
+}
+
+.ph-idle    { color: #3d5068; border-color: #1e3a5f; }
+.ph-running { color: #a0c4ff; border-color: #3a6aaf; animation: pulse 1s infinite; }
+.ph-done    { color: #50d080; border-color: #286040; }
+.ph-cached  { color: #60b8ff; border-color: #20508f; }
+.ph-error   { color: #e94560; border-color: #6f2030; }
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.5; }
+}
+
 /* ── Misc ─────────────────────────────────────────────────── */
 .loading {
   padding: 24px;
@@ -295,6 +326,20 @@ body {
       <!-- Assembly panel -->
       <div class="panel">
         <div class="panel-header">Assembly</div>
+
+        <!-- Phase progress strip (only when a file is selected) -->
+        <div class="phase-strip" v-if="selectedFile">
+          <span class="phase-badge" :class="'ph-' + phases.infer.status">
+            infer{{ phaseLabel(phases.infer) }}
+          </span>
+          <span class="phase-badge" :class="'ph-' + phases.grabasm.status">
+            compile{{ phaseLabel(phases.grabasm) }}
+          </span>
+          <span class="phase-badge" :class="'ph-' + phases.annotate.status">
+            annotate{{ phaseLabel(phases.annotate) }}
+          </span>
+        </div>
+
         <div class="panel-body" ref="asmPanel">
           <div v-if="loadingAsm" class="loading">annotating…</div>
           <div v-else-if="asmError" class="error-msg">{{ asmError }}</div>
@@ -324,6 +369,53 @@ body {
 <script>
 const { createApp, ref, computed, watch, onMounted } = Vue;
 
+// ── BlotWS: JSONRPC 2.0 over WebSocket ──────────────────────────────────
+
+class BlotWS {
+  constructor(onProgress) {
+    this._id = 0;
+    this._pending = new Map();  // id → {resolve, reject}
+    this._onProgress = onProgress;
+    this._ws = new WebSocket(`ws://${location.host}/ws`);
+    this._ws.onmessage = (ev) => this._onMessage(JSON.parse(ev.data));
+    this._ws.onerror = (ev) => console.error('ws error', ev);
+    this._ready = new Promise((res, rej) => {
+      this._ws.onopen = res;
+      this._ws.onerror = rej;
+    });
+  }
+
+  async call(method, params) {
+    await this._ready;
+    const id = ++this._id;
+    return new Promise((resolve, reject) => {
+      this._pending.set(id, { resolve, reject });
+      this._ws.send(JSON.stringify({ jsonrpc: '2.0', id, method, params }));
+    });
+  }
+
+  _onMessage(msg) {
+    // Server notification (no id field or id is null with a method field)
+    if (msg.method === 'blot/progress') {
+      if (this._onProgress) this._onProgress(msg.params);
+      return;
+    }
+    // Response
+    const entry = this._pending.get(msg.id);
+    if (!entry) return;
+    this._pending.delete(msg.id);
+    if (msg.error) {
+      entry.reject(msg.error);
+    } else {
+      entry.resolve(msg.result);
+    }
+  }
+
+  close() { this._ws.close(); }
+}
+
+// ── Vue app ──────────────────────────────────────────────────────────────
+
 createApp({
   setup() {
     // ── State ──────────────────────────────────────────────
@@ -336,7 +428,7 @@ createApp({
     const loadingSource = ref(false);
 
     const asmLines = ref([]);
-    const lineMappings = ref([]);  // [{source_line, asm_start, asm_end}]
+    const lineMappings = ref([]);
     const loadingAsm = ref(false);
     const asmError = ref('');
     const compilerInfo = ref('');
@@ -352,9 +444,20 @@ createApp({
       preserve_unused_labels: false,
     });
 
+    // Phase progress: {status: 'idle'|'running'|'done'|'cached'|'error', elapsed_ms}
+    const phases = ref({
+      infer:    { status: 'idle', elapsed_ms: null },
+      grabasm:  { status: 'idle', elapsed_ms: null },
+      annotate: { status: 'idle', elapsed_ms: null },
+    });
+
+    // Last infer token so reannotate can skip infer+grabasm
+    const lastInferToken = ref(null);
+    const lastAsmToken = ref(null);
+
+    let blotWS = null;
+
     // ── Computed: highlight maps ───────────────────────────
-    // srcColorMap: source_line → color_index
-    // asmColorMap: asm_line_1based → color_index
     const srcColorMap = computed(() => {
       const m = new Map();
       lineMappings.value.forEach((lm, idx) => {
@@ -373,7 +476,6 @@ createApp({
       return m;
     });
 
-    // Which source lines are in the hovered asm range?
     const hoveredSrcLinesFromAsm = computed(() => {
       if (!hoveredAsmLine.value) return new Set();
       const s = new Set();
@@ -385,7 +487,6 @@ createApp({
       return s;
     });
 
-    // Which asm lines are in the hovered source range?
     const hoveredAsmLinesFromSrc = computed(() => {
       if (!hoveredSourceLine.value) return new Set();
       const s = new Set();
@@ -440,12 +541,45 @@ createApp({
       return key.replace(/_/g,' ');
     }
 
+    function phaseLabel(ph) {
+      if (ph.status === 'idle') return '';
+      if (ph.status === 'running') return ' …';
+      if (ph.elapsed_ms !== null) return ` ${(ph.elapsed_ms / 1000).toFixed(1)}s`;
+      return '';
+    }
+
     const statusRoot = computed(() => {
       if (!status.value) return '';
       const r = status.value.project_root || '';
       const parts = r.split('/');
       return parts.slice(-2).join('/') || r;
     });
+
+    // ── Progress handler ───────────────────────────────────
+    function onProgress(p) {
+      const phaseMap = { infer: 'infer', grabasm: 'grabasm', annotate: 'annotate' };
+      const key = phaseMap[p.phase];
+      if (!key) return;
+      phases.value[key] = {
+        status: p.status,
+        elapsed_ms: p.elapsed_ms ?? null,
+      };
+    }
+
+    function formatError(e) {
+      // e is a JSONRPC error object: {code, message, data?}
+      if (typeof e === 'string') return e;
+      let msg = e.message || JSON.stringify(e);
+      if (e.data) {
+        if (e.data.dribble) {
+          const lines = Array.isArray(e.data.dribble) ? e.data.dribble.join('\n') : e.data.dribble;
+          msg += '\n' + lines;
+        } else {
+          msg += '\n' + JSON.stringify(e.data);
+        }
+      }
+      return msg;
+    }
 
     // ── API calls ──────────────────────────────────────────
     async function fetchStatus() {
@@ -473,6 +607,13 @@ createApp({
       lineMappings.value = [];
       asmError.value = '';
       compilerInfo.value = '';
+      lastInferToken.value = null;
+      lastAsmToken.value = null;
+      phases.value = {
+        infer:    { status: 'idle', elapsed_ms: null },
+        grabasm:  { status: 'idle', elapsed_ms: null },
+        annotate: { status: 'idle', elapsed_ms: null },
+      };
 
       loadingSource.value = true;
       try {
@@ -480,52 +621,84 @@ createApp({
         if (r.ok) {
           const data = await r.json();
           sourceLines.value = (data.content || '').split('\n');
-          // trim trailing empty line from split
           if (sourceLines.value.at(-1) === '') sourceLines.value.pop();
         }
       } finally { loadingSource.value = false; }
 
-      annotate(f);
+      runPipeline(f);
     }
 
-    async function annotate(file) {
-      if (!file) return;
+    async function runPipeline(file) {
+      if (!file || !blotWS) return;
       loadingAsm.value = true;
       asmError.value = '';
       asmLines.value = [];
       lineMappings.value = [];
       compilerInfo.value = '';
+
       try {
-        const r = await fetch('/api/annotate', {
-          method: 'POST',
-          headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify({ file, options: opts.value }),
-        });
-        const data = await r.json();
-        if (data.error) {
-          asmError.value = data.error.details || JSON.stringify(data.error);
-          if (data.error.dribble) asmError.value += '\n' + data.error.dribble.join('\n');
-        } else {
-          asmLines.value = data.assembly || [];
-          lineMappings.value = data.line_mappings || [];
-          if (data.compiler_invocation) {
-            const ci = data.compiler_invocation;
-            compilerInfo.value = `${ci.compiler}  ${ci.compiler_version}`;
-          }
+        // Phase 1: infer
+        const inferRes = await blotWS.call('blot/infer', { file });
+        lastInferToken.value = inferRes.token;
+
+        // Phase 2: grab_asm
+        const asmRes = await blotWS.call('blot/grab_asm', { token: inferRes.token });
+        lastAsmToken.value = asmRes.token;
+        if (asmRes.compilation_command) {
+          const ci = asmRes.compilation_command;
+          compilerInfo.value = `${ci.compiler}  ${ci.compiler_version}`;
         }
+
+        // Phase 3: annotate
+        const annRes = await blotWS.call('blot/annotate', {
+          token: asmRes.token,
+          options: opts.value,
+        });
+        asmLines.value = annRes.assembly || [];
+        lineMappings.value = annRes.line_mappings || [];
       } catch (e) {
-        asmError.value = String(e);
-      } finally { loadingAsm.value = false; }
+        asmError.value = formatError(e);
+      } finally {
+        loadingAsm.value = false;
+      }
     }
 
-    function reannotate() {
-      if (selectedFile.value) annotate(selectedFile.value);
+    async function reannotate() {
+      if (!selectedFile.value || !blotWS) return;
+      // If we have a cached asm token, only re-annotate
+      if (lastAsmToken.value !== null) {
+        loadingAsm.value = true;
+        asmError.value = '';
+        asmLines.value = [];
+        lineMappings.value = [];
+        phases.value.annotate = { status: 'idle', elapsed_ms: null };
+        try {
+          const annRes = await blotWS.call('blot/annotate', {
+            token: lastAsmToken.value,
+            options: opts.value,
+          });
+          asmLines.value = annRes.assembly || [];
+          lineMappings.value = annRes.line_mappings || [];
+        } catch (e) {
+          asmError.value = formatError(e);
+        } finally {
+          loadingAsm.value = false;
+        }
+      } else {
+        runPipeline(selectedFile.value);
+      }
     }
 
     // ── Init ───────────────────────────────────────────────
     onMounted(async () => {
+      blotWS = new BlotWS(onProgress);
       await fetchStatus();
       await fetchFiles();
+      try {
+        await blotWS.call('initialize', {});
+      } catch (e) {
+        console.error('initialize failed', e);
+      }
     });
 
     return {
@@ -534,10 +707,10 @@ createApp({
       sourceLines, loadingSource,
       asmLines, lineMappings, loadingAsm, asmError, compilerInfo,
       hoveredSourceLine, hoveredAsmLine,
-      opts,
+      opts, phases,
       srcRowClass, asmRowClass,
       hlCpp, hlAsm,
-      basename, optLabel,
+      basename, optLabel, phaseLabel,
       selectFile, reannotate,
     };
   }
