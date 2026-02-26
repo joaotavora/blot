@@ -85,6 +85,9 @@ include(test/cli/system-tests.cmake)
 # Add JSONRPC server tests
 include(test/jsonrpc/jsonrpc-tests.cmake)
 
+# Add web API tests (HTTP + WebSocket)
+include(test/web-api/web-api-tests.cmake)
+
 # Spoof executable for filesystem interception using overlayfs
 add_executable(spoof_exe src/spoof/main.cpp)
 target_link_libraries(spoof_exe PRIVATE
