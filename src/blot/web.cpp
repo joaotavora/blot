@@ -227,61 +227,6 @@ static http::response<http::string_body> dispatch(
   return make_error(http::status::not_found, "not found", version, keep_alive);
 }
 
-/// WebSocket session
-
-bool session_handle_frame(ws_session& sess, std::string_view text) {
-  json::value msg_val{};
-  {
-    std::error_code jec{};
-    msg_val = json::parse(text, jec);
-    if (jec) {
-      sess.send(make_jsonrpc_error(nullptr, -32700, "Parse error"));
-      return true;
-    }
-  }
-
-  auto* msg = msg_val.if_object();
-  if (!msg) {
-    sess.send(make_jsonrpc_error(nullptr, -32600, "Invalid Request"));
-    return true;
-  }
-
-  json::value id{nullptr};
-  if (msg->contains("id")) id = msg->at("id");
-
-  if (!msg->contains("method")) {
-    sess.send(make_jsonrpc_error(id, -32600, "missing method"));
-    return true;
-  }
-
-  std::string method{msg->at("method").as_string()};
-  const json::object* params_ptr{nullptr};
-  if (msg->contains("params")) {
-    params_ptr = msg->at("params").if_object();
-  }
-  json::object empty_params{};
-  const json::object& params = params_ptr ? *params_ptr : empty_params;
-
-  LOG_INFO("ws rpc: {}", method);
-
-  if (method == "initialize") {
-    sess.handle_initialize(id, params);
-  } else if (method == "blot/infer") {
-    sess.handle_infer(id, params);
-  } else if (method == "blot/grab_asm") {
-    sess.handle_grabasm(id, params);
-  } else if (method == "blot/annotate") {
-    sess.handle_annotate(id, params);
-  } else if (method == "shutdown") {
-    json::object result{};
-    sess.send(make_result(id, std::move(result)));
-    return false;
-  } else {
-    sess.send(make_jsonrpc_error(id, -32601, "Method not found"));
-  }
-  return true;
-}
-
 static void run_ws_session(
     websocket::stream<beast::tcp_stream> ws, const fs::path& ccj_path,
     const fs::path& project_root) {
@@ -292,8 +237,7 @@ static void run_ws_session(
     beast::flat_buffer buf{};
     ws.read(buf, ec);
     if (ec == websocket::error::closed || ec) break;
-    if (!session_handle_frame(sess, beast::buffers_to_string(buf.data())))
-      break;
+    if (!sess.handle_frame(beast::buffers_to_string(buf.data()))) break;
   }
   LOG_INFO("ws session ended");
 }
