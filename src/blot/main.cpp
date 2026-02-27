@@ -14,14 +14,14 @@
 #include <type_traits>
 #include <variant>
 
-#include "../libblot/json_helpers.hpp"
-#include "../libblot/linespan.hpp"
-#include "../libblot/logger.hpp"
-#include "../libblot/utils.hpp"
 #include "blot/assembly.hpp"
 #include "blot/blot.hpp"
 #include "blot/ccj.hpp"
+#include "json_helpers.hpp"
+#include "linespan.hpp"
+#include "logger.hpp"
 #include "options.hpp"
+#include "utils.hpp"
 #include "web_server.hpp"
 
 namespace fs = std::filesystem;

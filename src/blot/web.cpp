@@ -19,7 +19,7 @@
 #include <thread>
 #include <vector>
 
-#include "../libblot/logger.hpp"
+#include "logger.hpp"
 #include "session.hpp"
 #include "web_config.hpp"
 #include "web_server.hpp"
