@@ -10,12 +10,12 @@
 #include <unordered_map>
 #include <utility>
 
-#include "../libblot/json_helpers.hpp"
-#include "../libblot/linespan.hpp"
-#include "../libblot/logger.hpp"
 #include "blot/assembly.hpp"
 #include "blot/blot.hpp"
 #include "blot/ccj.hpp"
+#include "json_helpers.hpp"
+#include "linespan.hpp"
+#include "logger.hpp"
 
 namespace json = boost::json;
 

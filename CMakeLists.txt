@@ -54,7 +54,7 @@ configure_file(
 # Main executable
 file(GLOB blot_sources CONFIGURE_DEPENDS src/blot/*.cpp)
 add_executable(blot_exe ${blot_sources})
-target_include_directories(blot_exe PRIVATE include src/blot ${CMAKE_CURRENT_BINARY_DIR})
+target_include_directories(blot_exe PRIVATE include src/blot src/libblot ${CMAKE_CURRENT_BINARY_DIR})
 target_link_libraries(blot_exe PRIVATE
   blot_lib
   CLI11::CLI11
