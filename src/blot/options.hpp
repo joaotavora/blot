@@ -14,6 +14,7 @@ struct file_options {
   std::optional<fs::path> src_file_name{};
   std::optional<fs::path> compile_commands_path{};
   bool web_mode{};
+  bool stdio_mode{};
   int port{4242};
   std::optional<fs::path> web_root{};
 };
