@@ -157,13 +157,13 @@ for tests)
   JSONRPC/WebSocket server.  Many things are missing.  The
   highlighting is horribly slow for one.
 
-* *20%* Editor tooling
+* *30%* Editor tooling
 
-  A JSONRPC/stdio server proof-of-concept (`src/jsonrpc_server/`) is
-  implemented.  The API methods it currently exposes are bunk though.
-  It should serve the same API as the Web UI and be integrated into
-  `blot --stdio` one day, so we can build an Emacs extension that is a
-  cross between [Eglot][eglot] and [Beardbolt][beardbolt].
+  `blot --stdio` serves the same API as `blot --web` so one day we can
+  build an Emacs extension that uses Eglot's LSP transport ideas
+  [Eglot][eglot] (for maintaining per-project connections, requesting
+  things and communicating file changes) but has
+  [Beardbolt][beardbolt]'s UI.
 
 * *20%* Decent-ish C/C++ stable API and ABI.  The so-called
   "hourglass" pattern might come in handy
