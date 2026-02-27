@@ -21,8 +21,8 @@
 
 #include "logger.hpp"
 #include "session.hpp"
+#include "web.hpp"
 #include "web_config.hpp"
-#include "web_server.hpp"
 
 namespace beast = boost::beast;
 namespace http = beast::http;

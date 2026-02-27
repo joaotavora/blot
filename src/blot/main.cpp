@@ -21,8 +21,9 @@
 #include "linespan.hpp"
 #include "logger.hpp"
 #include "options.hpp"
+#include "stdio.hpp"
 #include "utils.hpp"
-#include "web_server.hpp"
+#include "web.hpp"
 
 namespace fs = std::filesystem;
 namespace blot = xpto::blot;
@@ -128,19 +129,27 @@ int main(int argc, char* argv[]) {
   xpto::logger::set_level(static_cast<xpto::logger::level>(loglevel));
   LOG_DEBUG("loglevel={}", loglevel);
 
-  if (fopts.web_mode) {
-    fs::path ccj_path;
+  auto ccj_or_die = [&](std::string_view blurb) {
     if (fopts.compile_commands_path) {
-      ccj_path = *fopts.compile_commands_path;
+      return *fopts.compile_commands_path;
     } else {
       auto ccj = blot::find_ccj();
       if (!ccj) {
-        std::cerr << "blot --web: can't find compile_commands.json in cwd\n";
-        return 1;
+        std::cerr << "blot " << blurb
+                  << ": can't find compile_commands.json in cwd\n";
+        std::exit(-1);
       }
-      ccj_path = *ccj;
+      return *ccj;
     }
-    blot::run_web_server(ccj_path, fopts.port);
+  };
+
+  if (fopts.stdio_mode) {
+    blot::run_stdio_server(ccj_or_die("--stdio"));
+    return 0;
+  }
+
+  if (fopts.web_mode) {
+    blot::run_web_server(ccj_or_die("--web"), fopts.port);
     return 0;
   }
 

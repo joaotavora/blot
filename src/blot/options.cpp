@@ -45,6 +45,10 @@ std::optional<int> parse_options(
       ->capture_default_str();
   app.add_flag("--web", fopts.web_mode, "Start HTTP server with browser UI")
       ->capture_default_str();
+  app.add_flag(
+         "--stdio", fopts.stdio_mode,
+         "Start JSONRPC server on stdin/stdout (Content-Length framing)")
+      ->capture_default_str();
   app.add_option("--port", fopts.port, "Port for --web mode (default 4242)")
       ->capture_default_str();
   app.add_option(
