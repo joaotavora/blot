@@ -6,7 +6,7 @@ The client passes an 'inference' dict (compilation_command + directory) that
 matches a key already in asm_cache_2 → cached='other', no recompile.
 """
 
-from web_tests_common import BlotServer, fixture_ccj, run_tests
+from common import BlotServer, fixture_ccj, run_tests
 
 
 CCJ = fixture_ccj('gcc-minimal')
@@ -14,19 +14,19 @@ CCJ = fixture_ccj('gcc-minimal')
 
 def test_grabasm_cache_other_inference_object():
     with BlotServer(CCJ) as srv:
-        ws = srv.ws_connect()
+        endpoint = srv.connect()
         try:
-            ws.call('initialize', {})
+            endpoint.call('initialize', {})
 
             # Populate asm_cache_2
-            infer_res = ws.call('blot/infer', {'file': 'source.cpp'})
+            infer_res = endpoint.call('blot/infer', {'file': 'source.cpp'})
             tok = infer_res['token']
-            asm_res = ws.call('blot/grab_asm', {'token': tok})
+            asm_res = endpoint.call('blot/grab_asm', {'token': tok})
             assert asm_res['cached'] is False
 
             # Pass explicit inference object — same command+directory → asm_cache_2 hit
             inf = infer_res['inference']
-            asm2 = ws.call(
+            asm2 = endpoint.call(
                 'blot/grab_asm',
                 {
                     'inference': {
@@ -43,7 +43,7 @@ def test_grabasm_cache_other_inference_object():
                 f'token mismatch: {asm2["token"]} != {tok}'
             )
         finally:
-            ws.close()
+            endpoint.close()
 
 
 if __name__ == '__main__':

@@ -82,8 +82,8 @@ doctest_discover_tests(test_blot)
 # Add system tests for blot executable
 include(test/cli/system-tests.cmake)
 
-# Add web API tests (HTTP + WebSocket)
-include(test/web-api/web-api-tests.cmake)
+# Add server tests (HTTP + JSONRPC session)
+include(test/server/server-tests.cmake)
 
 # Spoof executable for filesystem interception using overlayfs
 add_executable(spoof_exe src/spoof/main.cpp)

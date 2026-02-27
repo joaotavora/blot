@@ -26,7 +26,7 @@ body {
   overflow: hidden;
 }
 
-/* ── Top bar ─────────────────────────────────────────────── */
+/* Top bar */
 .topbar {
   background: #16213e;
   border-bottom: 1px solid #0f3460;
@@ -75,14 +75,14 @@ body {
   cursor: pointer;
 }
 
-/* ── Main layout ─────────────────────────────────────────── */
+/* Main layout */
 .main {
   display: flex;
   flex: 1;
   overflow: hidden;
 }
 
-/* ── File tree ───────────────────────────────────────────── */
+/* File tree */
 .filetree {
   width: 220px;
   min-width: 150px;
@@ -120,7 +120,7 @@ body {
   font-weight: 600;
 }
 
-/* ── Editor panels ───────────────────────────────────────── */
+/* Editor panels */
 .panels {
   display: flex;
   flex: 1;
@@ -156,7 +156,7 @@ body {
   overflow-x: auto;
 }
 
-/* ── Code tables (line numbers + code) ───────────────────── */
+/* Code tables (line numbers + code) */
 .code-table {
   width: 100%;
   border-collapse: collapse;
@@ -205,7 +205,7 @@ body {
 .hl-hover-8  { background: rgba(255, 64,128, 0.45); }
 .hl-hover-9  { background: rgba(185,255, 64, 0.45); }
 
-/* ── Phase progress strip ─────────────────────────────────── */
+/* Phase progress strip */
 .phase-strip {
   display: flex;
   gap: 6px;
@@ -236,7 +236,7 @@ body {
   50%       { opacity: 0.5; }
 }
 
-/* ── Misc ─────────────────────────────────────────────────── */
+/* Misc */
 .loading {
   padding: 24px;
   color: #607080;
@@ -369,7 +369,7 @@ body {
 <script>
 const { createApp, ref, computed, watch, onMounted } = Vue;
 
-// ── BlotWS: JSONRPC 2.0 over WebSocket ──────────────────────────────────
+// BlotWS: JSONRPC 2.0 over WebSocket
 
 class BlotWS {
   constructor(onProgress) {
@@ -414,11 +414,11 @@ class BlotWS {
   close() { this._ws.close(); }
 }
 
-// ── Vue app ──────────────────────────────────────────────────────────────
+// Vue app
 
 createApp({
   setup() {
-    // ── State ──────────────────────────────────────────────
+    // State
     const status = ref(null);
     const statusError = ref(false);
     const files = ref([]);
@@ -457,7 +457,7 @@ createApp({
 
     let blotWS = null;
 
-    // ── Computed: highlight maps ───────────────────────────
+    // Computed: highlight maps
     const srcColorMap = computed(() => {
       const m = new Map();
       lineMappings.value.forEach((lm, idx) => {
@@ -498,7 +498,7 @@ createApp({
       return s;
     });
 
-    // ── Row class helpers ──────────────────────────────────
+    // Row class helpers
     function srcRowClass(lineNum) {
       const hover = hoveredSrcLinesFromAsm.value.has(lineNum)
                  || hoveredSourceLine.value === lineNum;
@@ -515,7 +515,7 @@ createApp({
       return hover ? `hl-hover-${ci}` : `hl-${ci}`;
     }
 
-    // ── Syntax highlighting helpers ────────────────────────
+    // Syntax highlighting helpers
     function hlCpp(code) {
       try {
         return hljs.highlight(code, { language: 'cpp' }).value;
@@ -532,7 +532,7 @@ createApp({
       return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
     }
 
-    // ── Helpers ────────────────────────────────────────────
+    // Helpers
     function basename(p) {
       return p.split('/').pop() || p;
     }
@@ -555,7 +555,7 @@ createApp({
       return parts.slice(-2).join('/') || r;
     });
 
-    // ── Progress handler ───────────────────────────────────
+    // Progress handler
     function onProgress(p) {
       const phaseMap = { infer: 'infer', grabasm: 'grabasm', annotate: 'annotate' };
       const key = phaseMap[p.phase];
@@ -581,7 +581,7 @@ createApp({
       return msg;
     }
 
-    // ── API calls ──────────────────────────────────────────
+    // API calls
     async function fetchStatus() {
       try {
         const r = await fetch('/api/status');
@@ -689,7 +689,7 @@ createApp({
       }
     }
 
-    // ── Init ───────────────────────────────────────────────
+    // Init
     onMounted(async () => {
       blotWS = new BlotWS(onProgress);
       await fetchStatus();

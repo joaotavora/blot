@@ -1,17 +1,21 @@
 """
-Shared utilities for blot --web HTTP and WebSocket tests.
+Shared utilities for blot --web HTTP and JSONRPC session tests.
 
-Lives in test/web-api/ alongside the test scripts so that
-'import web_tests_common' works without any sys.path manipulation.
+Lives in test/server/ alongside the test scripts so that
+'import common' works without any sys.path manipulation.
 
 Usage:
-    from web_tests_common import BlotServer, BlotWS
+    from common import BlotServer, fixture_ccj
 
     with BlotServer(ccj_path) as srv:
-        data = srv.http_get('/api/status')
-        ws   = srv.ws_connect()
-        ws.call('initialize', {})
-        ws.close()
+        data     = srv.http_get('/api/status')   # ws transport only
+        endpoint = srv.connect()
+        endpoint.call('initialize', {})
+        endpoint.close()
+
+The active transport is selected by the BLOT_TRANSPORT environment
+variable ('ws' or 'stdio', default 'ws').  CMake registers every
+session test twice — once per transport — with the appropriate value.
 """
 
 import base64
@@ -26,15 +30,16 @@ import urllib.error
 import urllib.request
 
 
-# ── Environment ───────────────────────────────────────────────────────────
+# Environment
 
 BLOT_EXE = os.environ.get('BLOT_EXE', './build-Debug/blot')
 FIXTURE_DIR = os.environ.get(
     'BLOT_FIXTURE_DIR', os.path.join(os.path.dirname(__file__), '../fixture')
 )
+BLOT_TRANSPORT = os.environ.get('BLOT_TRANSPORT', 'ws')
 
 
-# ── Free-port helper ──────────────────────────────────────────────────────
+# Free-port helper
 
 
 def _free_port():
@@ -44,78 +49,81 @@ def _free_port():
         return s.getsockname()[1]
 
 
-# ── BlotServer context manager ────────────────────────────────────────────
+# BlotServer context manager
 
 
 class BlotServer:
     """
-    Context manager that spawns `blot --web` and waits until it is ready.
+    Context manager that provides a JSONRPC session endpoint.
+
+    For the 'ws' transport it spawns `blot --web` and waits until ready;
+    connect() returns a BlotWS connected to that server.
+
+    For the 'stdio' transport __enter__ is a no-op; each connect() call
+    spawns its own `blot --stdio` subprocess.
 
     with BlotServer(ccj_path) as srv:
-        data   = srv.http_get('/api/status')
-        result = srv.http_get_raw('/api/source?file=foo.cpp')
-        ws     = srv.ws_connect()
+        endpoint = srv.connect()
+        endpoint.call('initialize', {})
+        endpoint.close()
 
-    On exit the subprocess is terminated and waited for.
+    HTTP helpers (http_get, http_get_raw) are only available for 'ws'.
     """
 
     def __init__(self, ccj_path):
-        self.host = '127.0.0.1'
-        self.port = _free_port()
         self._ccj_path = os.path.abspath(ccj_path)
-        # Run the server from the fixture directory so that relative
-        # "directory": "." entries in compile_commands.json resolve correctly.
         self._cwd = os.path.dirname(self._ccj_path)
+        self.host = '127.0.0.1'
+        self.port = _free_port() if BLOT_TRANSPORT == 'ws' else None
         self._proc = None
 
     def __enter__(self):
-        self._proc = subprocess.Popen(
-            [
-                BLOT_EXE,
-                '--web',
-                '--port',
-                str(self.port),
-                '--ccj',
-                self._ccj_path,
-            ],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            cwd=self._cwd,
-        )
-        # Poll HTTP until ready (up to 10 seconds)
-        deadline = time.monotonic() + 10.0
-        while time.monotonic() < deadline:
-            # Check if the process already died (startup error)
-            rc = self._proc.poll()
-            if rc is not None:
-                out, err = b'', b''
+        if BLOT_TRANSPORT == 'ws':
+            self._proc = subprocess.Popen(
+                [
+                    BLOT_EXE,
+                    '--web',
+                    '--port',
+                    str(self.port),
+                    '--ccj',
+                    self._ccj_path,
+                ],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                cwd=self._cwd,
+            )
+            deadline = time.monotonic() + 10.0
+            while time.monotonic() < deadline:
+                rc = self._proc.poll()
+                if rc is not None:
+                    out, err = b'', b''
+                    try:
+                        out = self._proc.stdout.read()
+                        err = self._proc.stderr.read()
+                    except Exception:
+                        pass
+                    raise RuntimeError(
+                        f'blot --web exited early (rc={rc})\n'
+                        f'stdout: {out.decode(errors="replace")}\n'
+                        f'stderr: {err.decode(errors="replace")}'
+                    )
                 try:
-                    out = self._proc.stdout.read()
-                    err = self._proc.stderr.read()
-                except Exception:
-                    pass
-                raise RuntimeError(
-                    f"blot --web exited early (rc={rc})\n"
-                    f"stdout: {out.decode(errors='replace')}\n"
-                    f"stderr: {err.decode(errors='replace')}"
-                )
-            try:
-                urllib.request.urlopen(
-                    f'http://{self.host}:{self.port}/api/status', timeout=1
-                )
-                return self
-            except urllib.error.URLError:
-                time.sleep(0.05)
-        # Timed out — dump output and raise
-        self._proc.terminate()
-        self._proc.wait(timeout=3)
-        out = self._proc.stdout.read()
-        err = self._proc.stderr.read()
-        raise RuntimeError(
-            f"blot --web did not become ready on port {self.port}\n"
-            f"stdout: {out.decode(errors='replace')}\n"
-            f"stderr: {err.decode(errors='replace')}"
-        )
+                    urllib.request.urlopen(
+                        f'http://{self.host}:{self.port}/api/status', timeout=1
+                    )
+                    return self
+                except urllib.error.URLError:
+                    time.sleep(0.05)
+            self._proc.terminate()
+            self._proc.wait(timeout=3)
+            out = self._proc.stdout.read()
+            err = self._proc.stderr.read()
+            raise RuntimeError(
+                f'blot --web did not become ready on port {self.port}\n'
+                f'stdout: {out.decode(errors="replace")}\n'
+                f'stderr: {err.decode(errors="replace")}'
+            )
+        return self
 
     def __exit__(self, *_):
         if self._proc:
@@ -126,7 +134,15 @@ class BlotServer:
                 self._proc.kill()
                 self._proc.wait()
 
-    # ── HTTP helpers ──────────────────────────────────────────────────────
+    # Endpoint factory
+
+    def connect(self):
+        """Return a JSONRPC endpoint for the active transport."""
+        if BLOT_TRANSPORT == 'ws':
+            return BlotWS(self.host, self.port)
+        return StdioEndpoint(self._ccj_path, self._cwd)
+
+    # HTTP helpers (ws transport only)
 
     def http_get(self, path):
         """GET path, assert 200, return parsed JSON body."""
@@ -143,14 +159,83 @@ class BlotServer:
         except urllib.error.HTTPError as e:
             return e.code, e.read()
 
-    # ── WebSocket factory ─────────────────────────────────────────────────
 
-    def ws_connect(self):
-        """Return a connected BlotWS for JSONRPC calls."""
-        return BlotWS(self.host, self.port)
+# JSONRPC-over-stdio endpoint
 
 
-# ── Minimal WebSocket client (no third-party deps) ────────────────────────
+class StdioEndpoint:
+    """
+    JSONRPC 2.0 over Content-Length-framed stdin/stdout (LSP convention).
+
+    Each instance spawns its own `blot --stdio` subprocess.
+    """
+
+    def __init__(self, ccj_path, cwd):
+        self._proc = subprocess.Popen(
+            [BLOT_EXE, '--stdio', '--ccj', ccj_path],
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            cwd=cwd,
+        )
+        self._next_id = 0
+        self._notifications = []
+
+    def _send(self, msg):
+        text = json.dumps(msg).encode('utf-8')
+        header = f'Content-Length: {len(text)}\r\n\r\n'.encode()
+        self._proc.stdin.write(header + text)
+        self._proc.stdin.flush()
+
+    def _recv(self):
+        headers = {}
+        while True:
+            line = self._proc.stdout.readline().decode('utf-8').rstrip('\r\n')
+            if not line:
+                break
+            if ':' in line:
+                key, _, val = line.partition(':')
+                headers[key.strip()] = val.strip()
+        length = int(headers['Content-Length'])
+        body = self._proc.stdout.read(length)
+        return json.loads(body)
+
+    def call(self, method, params=None):
+        """Send a JSONRPC request and wait for the matching response."""
+        self._next_id += 1
+        req_id = self._next_id
+        msg = {'jsonrpc': '2.0', 'id': req_id, 'method': method}
+        if params is not None:
+            msg['params'] = params
+        self._send(msg)
+        while True:
+            obj = self._recv()
+            if 'method' in obj:
+                self._notifications.append(obj)
+            elif obj.get('id') == req_id:
+                if 'error' in obj:
+                    raise JsonRpcError(obj['error'])
+                return obj.get('result', {})
+
+    def pop_notifications(self):
+        """Return and clear buffered notifications."""
+        n = list(self._notifications)
+        self._notifications.clear()
+        return n
+
+    def close(self):
+        try:
+            self._proc.stdin.close()
+        except Exception:
+            pass
+        try:
+            self._proc.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            self._proc.kill()
+            self._proc.wait()
+
+
+# Minimal WebSocket client (no third-party deps)
 
 _WS_MAGIC = '258EAFA5-E914-47DA-95CA-C5AB0DC85B11'
 
@@ -181,7 +266,6 @@ class _RawWS:
             f'\r\n'
         )
         self._sock.sendall(req.encode())
-        # Read until \r\n\r\n
         buf = b''
         while b'\r\n\r\n' not in buf:
             chunk = self._sock.recv(1)
@@ -200,9 +284,9 @@ class _RawWS:
         mask_key = os.urandom(4)
         masked = bytes(b ^ mask_key[i % 4] for i, b in enumerate(payload))
         frame = bytearray()
-        frame.append(0x80 | opcode)  # FIN + opcode
+        frame.append(0x80 | opcode)
         if n < 126:
-            frame.append(0x80 | n)  # MASK bit + 7-bit length
+            frame.append(0x80 | n)
         elif n < 65536:
             frame.append(0x80 | 126)
             frame += struct.pack('>H', n)
@@ -249,7 +333,6 @@ class _RawWS:
             if opcode == 0x8:
                 raise ConnectionError('WebSocket closed by server')
             if opcode == 0x9:
-                # Ping — send pong
                 self._send_frame(0xA, payload)
 
     def close(self):
@@ -263,19 +346,19 @@ class _RawWS:
             pass
 
 
-# ── JSONRPC-over-WebSocket client ─────────────────────────────────────────
+# JSONRPC-over-WebSocket endpoint
 
 
 class BlotWS:
     """
-    JSONRPC 2.0 over WebSocket client.
+    JSONRPC 2.0 over WebSocket endpoint.
 
-    result = ws.call('blot/infer', {'file': 'source.cpp'})
-    notifs = ws.pop_notifications()
+    result = endpoint.call('blot/infer', {'file': 'source.cpp'})
+    notifs = endpoint.pop_notifications()
 
     call() blocks until the matching response arrives.  Any
     blot/progress notifications received in-flight are buffered
-    and returned by pop_notifications().  Raises on JSONRPC error.
+    and returned by pop_notifications().  Raises JsonRpcError on error.
     """
 
     def __init__(self, host, port):
@@ -291,12 +374,10 @@ class BlotWS:
         if params is not None:
             msg['params'] = params
         self._ws.send_text(json.dumps(msg))
-        # Drain frames until we see the response for req_id
         while True:
             raw = self._ws.recv_text()
             obj = json.loads(raw)
             if 'method' in obj:
-                # Server-sent notification
                 self._notifications.append(obj)
             elif obj.get('id') == req_id:
                 if 'error' in obj:
@@ -320,10 +401,10 @@ class JsonRpcError(Exception):
         self.code = error_obj.get('code')
         self.message = error_obj.get('message', '')
         self.data = error_obj.get('data')
-        super().__init__(f"JSONRPC error {self.code}: {self.message}")
+        super().__init__(f'JSONRPC error {self.code}: {self.message}')
 
 
-# ── Test runner helpers ───────────────────────────────────────────────────
+# Test runner helpers
 
 
 def fixture(name):

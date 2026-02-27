@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
-Test the full blot/infer → blot/grab_asm → blot/annotate pipeline over WS.
+Test the full blot/infer → blot/grab_asm → blot/annotate pipeline.
 """
 
-from web_tests_common import BlotServer, fixture_ccj, run_tests
+from common import BlotServer, fixture_ccj, run_tests
 
 
 CCJ = fixture_ccj('gcc-minimal')
@@ -12,12 +12,12 @@ CCJ = fixture_ccj('gcc-minimal')
 def test_full_pipeline():
     """infer→grab_asm→annotate returns assembly and line_mappings."""
     with BlotServer(CCJ) as srv:
-        ws = srv.ws_connect()
+        endpoint = srv.connect()
         try:
-            ws.call('initialize', {})
+            endpoint.call('initialize', {})
 
             # Phase 1 – infer
-            infer_res = ws.call('blot/infer', {'file': 'source.cpp'})
+            infer_res = endpoint.call('blot/infer', {'file': 'source.cpp'})
             assert 'token' in infer_res, f'infer: missing token: {infer_res}'
             assert 'inference' in infer_res, (
                 f'infer: missing inference: {infer_res}'
@@ -37,7 +37,7 @@ def test_full_pipeline():
             )
 
             # Phase 2 – grab_asm
-            asm_res = ws.call('blot/grab_asm', {'token': infer_res['token']})
+            asm_res = endpoint.call('blot/grab_asm', {'token': infer_res['token']})
             assert 'token' in asm_res, f'grab_asm: missing token: {asm_res}'
             assert 'compilation_command' in asm_res, (
                 f'grab_asm: missing compilation_command: {asm_res}'
@@ -47,7 +47,7 @@ def test_full_pipeline():
             )
 
             # Phase 3 – annotate
-            ann_res = ws.call(
+            ann_res = endpoint.call(
                 'blot/annotate',
                 {
                     'token': asm_res['token'],
@@ -71,18 +71,18 @@ def test_full_pipeline():
                 f'first annotate should not be cached: {ann_res["cached"]}'
             )
         finally:
-            ws.close()
+            endpoint.close()
 
 
 def test_progress_notifications():
     """Each pipeline phase emits running then done/cached progress notifications."""
     with BlotServer(CCJ) as srv:
-        ws = srv.ws_connect()
+        endpoint = srv.connect()
         try:
-            ws.call('initialize', {})
+            endpoint.call('initialize', {})
 
-            ws.call('blot/infer', {'file': 'source.cpp'})
-            infer_notifs = ws.pop_notifications()
+            endpoint.call('blot/infer', {'file': 'source.cpp'})
+            infer_notifs = endpoint.pop_notifications()
 
             phases = [n['params']['phase'] for n in infer_notifs]
             statuses = [n['params']['status'] for n in infer_notifs]
@@ -102,37 +102,37 @@ def test_progress_notifications():
                 'done notification should have elapsed_ms'
             )
         finally:
-            ws.close()
+            endpoint.close()
 
 
 def test_infer_unknown_file():
     """infer for a file not in the CCJ returns a JSONRPC error."""
-    from web_tests_common import JsonRpcError
+    from common import JsonRpcError
 
     with BlotServer(CCJ) as srv:
-        ws = srv.ws_connect()
+        endpoint = srv.connect()
         try:
-            ws.call('initialize', {})
+            endpoint.call('initialize', {})
             try:
-                ws.call('blot/infer', {'file': 'no_such_file.cpp'})
+                endpoint.call('blot/infer', {'file': 'no_such_file.cpp'})
                 assert False, 'expected JsonRpcError'
             except JsonRpcError as e:
                 assert e.code in (-32602, -32603), (
                     f'unexpected error code: {e.code}'
                 )
         finally:
-            ws.close()
+            endpoint.close()
 
 
 def test_annotate_with_options():
     """demangle=True and preserve_directives=True are accepted."""
     with BlotServer(CCJ) as srv:
-        ws = srv.ws_connect()
+        endpoint = srv.connect()
         try:
-            ws.call('initialize', {})
-            infer_res = ws.call('blot/infer', {'file': 'source.cpp'})
-            asm_res = ws.call('blot/grab_asm', {'token': infer_res['token']})
-            ann_res = ws.call(
+            endpoint.call('initialize', {})
+            infer_res = endpoint.call('blot/infer', {'file': 'source.cpp'})
+            asm_res = endpoint.call('blot/grab_asm', {'token': infer_res['token']})
+            ann_res = endpoint.call(
                 'blot/annotate',
                 {
                     'token': asm_res['token'],
@@ -146,7 +146,7 @@ def test_annotate_with_options():
             assert 'assembly' in ann_res
             assert len(ann_res['assembly']) > 0
         finally:
-            ws.close()
+            endpoint.close()
 
 
 if __name__ == '__main__':

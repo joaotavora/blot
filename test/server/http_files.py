@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Test GET /api/files and GET /api/source"""
-from web_tests_common import BlotServer, fixture_ccj, run_tests
+from common import BlotServer, fixture_ccj, run_tests
 
 
 CCJ = fixture_ccj('gcc-minimal')

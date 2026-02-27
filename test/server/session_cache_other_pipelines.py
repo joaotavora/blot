@@ -8,7 +8,7 @@ asm_cache_1, falls through infer_cache_1 to recover the same command, then hits
 asm_cache_2 → cached='other', returns tok_a.
 """
 
-from web_tests_common import BlotServer, fixture_ccj, run_tests
+from common import BlotServer, fixture_ccj, run_tests
 
 
 CCJ = fixture_ccj('gcc-minimal')
@@ -16,23 +16,23 @@ CCJ = fixture_ccj('gcc-minimal')
 
 def test_grabasm_cache_other_two_pipelines():
     with BlotServer(CCJ) as srv:
-        ws = srv.ws_connect()
+        endpoint = srv.connect()
         try:
-            ws.call('initialize', {})
+            endpoint.call('initialize', {})
 
             # Pipeline A: populate asm_cache_2
-            infer_a = ws.call('blot/infer', {'file': 'source.cpp'})
+            infer_a = endpoint.call('blot/infer', {'file': 'source.cpp'})
             tok_a = infer_a['token']
-            asm_a = ws.call('blot/grab_asm', {'token': tok_a})
+            asm_a = endpoint.call('blot/grab_asm', {'token': tok_a})
             assert asm_a['cached'] is False, 'pipeline A grab_asm should be uncached'
 
             # Pipeline B: fresh infer yields a new token
-            infer_b = ws.call('blot/infer', {'file': 'source.cpp'})
+            infer_b = endpoint.call('blot/infer', {'file': 'source.cpp'})
             tok_b = infer_b['token']
             assert tok_b != tok_a, 'second infer should produce a distinct token'
 
             # grab_asm(tok_b): misses asm_cache_1, falls through, hits asm_cache_2
-            asm_b = ws.call('blot/grab_asm', {'token': tok_b})
+            asm_b = endpoint.call('blot/grab_asm', {'token': tok_b})
             assert asm_b['cached'] == 'other', (
                 f'expected cached="other", got {asm_b["cached"]!r}'
             )
@@ -40,7 +40,7 @@ def test_grabasm_cache_other_two_pipelines():
                 f'expected tok_a={tok_a}, got {asm_b["token"]}'
             )
         finally:
-            ws.close()
+            endpoint.close()
 
 
 if __name__ == '__main__':
