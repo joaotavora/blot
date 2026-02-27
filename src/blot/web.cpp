@@ -97,7 +97,7 @@ static http::response<http::string_body> dispatch(
   const bool keep_alive = req.keep_alive();
   const auto target = std::string(req.target());
 
-  // ── Static files (anything not under /api/) ──────────────
+  // Static files (anything not under /api/)
   if (req.method() == http::verb::get && !target.starts_with("/api/")) {
     // Map "/" or "/index.html" → "index.html", strip leading "/"
     std::string rel = (target == "/" || target == "/index.html")
@@ -131,7 +131,7 @@ static http::response<http::string_body> dispatch(
         keep_alive);
   }
 
-  // ── GET /api/status ──────────────────────────────────────
+  // GET /api/status
   if (req.method() == http::verb::get && target == "/api/status") {
     std::error_code ec;
     auto entries = json::parse(
@@ -147,7 +147,7 @@ static http::response<http::string_body> dispatch(
     return make_json_response(http::status::ok, obj, version, keep_alive);
   }
 
-  // ── GET /api/files ───────────────────────────────────────
+  // GET /api/files
   if (req.method() == http::verb::get && target == "/api/files") {
     auto srcs = list_source_files(project_root);
     json::object obj;
@@ -156,7 +156,7 @@ static http::response<http::string_body> dispatch(
     return make_json_response(http::status::ok, obj, version, keep_alive);
   }
 
-  // ── GET /api/source?file=... ─────────────────────────────
+  // GET /api/source?file=...
   if (req.method() == http::verb::get && target.starts_with("/api/source")) {
     auto qpos = target.find('?');
     if (qpos == std::string::npos)
@@ -266,7 +266,7 @@ static void handle_connection(
 
     LOG_INFO("{} {}", req.method_string(), req.target());
 
-    // ── WebSocket upgrade ─────────────────────────────────
+    // WebSocket upgrade
     if (websocket::is_upgrade(req) && req.target() == "/ws") {
       websocket::stream<beast::tcp_stream> ws{std::move(stream)};
       beast::error_code wec;
