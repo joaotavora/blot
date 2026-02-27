@@ -12,6 +12,7 @@
 
 #include "../libblot/json_helpers.hpp"
 #include "../libblot/linespan.hpp"
+#include "../libblot/logger.hpp"
 #include "blot/assembly.hpp"
 #include "blot/blot.hpp"
 #include "blot/ccj.hpp"
@@ -94,8 +95,6 @@ class session {
     return aopts;
   }
 
-  void reply(json::object msg) { static_cast<Derived*>(this)->send(msg); }
-
   void send_progress(
       const json::value& request_id, std::string_view phase,
       std::string_view status,
@@ -109,7 +108,7 @@ class session {
     msg["jsonrpc"] = "2.0";
     msg["method"] = "blot/progress";
     msg["params"] = std::move(params);
-    reply(std::move(msg));
+    static_cast<Derived*>(this)->send(msg);
   }
 
   const fs::path* ccj_path;
@@ -131,7 +130,7 @@ class session {
 
   /// Handlers
 
-  void handle_initialize(
+  json::object handle_initialize(
       const json::value& id, const json::object& /*params*/) {
     json::object result{};
     json::object server_info{};
@@ -140,10 +139,10 @@ class session {
     result["serverInfo"] = std::move(server_info);
     result["ccj"] = ccj_path->string();
     result["project_root"] = project_root->string();
-    reply(make_result(id, std::move(result)));
+    return make_result(id, std::move(result));
   }
 
-  void handle_infer(const json::value& id, const json::object& params) {
+  json::object handle_infer(const json::value& id, const json::object& params) {
     token_t tok{};
     if (params.contains("token")) {
       tok = params.at("token").as_int64();
@@ -157,23 +156,22 @@ class session {
         inf["compilation_command"] = it->second.cmd.command;
         inf["compilation_directory"] = it->second.cmd.directory.string();
         result["inference"] = std::move(inf);
-        return reply(make_result(id, std::move(result)));
+        return make_result(id, std::move(result));
       }
-      return reply(
-          make_jsonrpc_error(id, -32602, "token not found in infer cache"));
+      return make_jsonrpc_error(id, -32602, "token not found in infer cache");
     } else {
       tok = next_token();
     }
 
     if (!params.contains("file"))
-      return reply(make_jsonrpc_error(id, -32602, "missing 'file' or 'token'"));
+      return make_jsonrpc_error(id, -32602, "missing 'file' or 'token'");
 
     std::string file_str{params.at("file").as_string()};
 
     std::error_code ec{};
     auto abs_file = fs::weakly_canonical(*project_root / file_str, ec);
     if (ec || abs_file.string().find(project_root->string()) != 0)
-      return reply(make_jsonrpc_error(id, -32602, "path traversal denied"));
+      return make_jsonrpc_error(id, -32602, "path traversal denied");
 
     send_progress(id, "infer", "running");
     auto t0 = clock_t::now();
@@ -186,16 +184,14 @@ class session {
       send_progress(id, "infer", "error", ms);
       json::object data{};
       data["dribble"] = e.what();
-      return reply(
-          make_jsonrpc_error(id, -32603, "infer() threw", std::move(data)));
+      return make_jsonrpc_error(id, -32603, "infer() threw", std::move(data));
     }
 
     auto ms = duration_ms(t0);
 
     if (!cmd) {
       send_progress(id, "infer", "error", ms);
-      return reply(
-          make_jsonrpc_error(id, -32602, "no CCJ entry found for file"));
+      return make_jsonrpc_error(id, -32602, "no CCJ entry found for file");
     }
 
     send_progress(id, "infer", "done", ms);
@@ -210,10 +206,11 @@ class session {
     inf["compilation_command"] = cmd->command;
     inf["compilation_directory"] = cmd->directory.string();
     result["inference"] = std::move(inf);
-    reply(make_result(id, std::move(result)));
+    return make_result(id, std::move(result));
   }
 
-  void handle_grabasm(const json::value& id, const json::object& params) {
+  json::object handle_grabasm(
+      const json::value& id, const json::object& params) {
     std::optional<compile_command> cmd_opt{};
 
     token_t tok{};
@@ -230,15 +227,14 @@ class session {
         cc["compiler"] = it->second.result.invocation.compiler;
         cc["compiler_version"] = it->second.result.invocation.compiler_version;
         result["compilation_command"] = std::move(cc);
-        return reply(make_result(id, std::move(result)));
+        return make_result(id, std::move(result));
       }
 
       // Fall back to the previous phase
       if (auto it = infer_cache_1.find(tok); it != infer_cache_1.end()) {
         cmd_opt = it->second.cmd;
       } else {
-        return reply(
-            make_jsonrpc_error(id, -32602, "token not found in infer cache"));
+        return make_jsonrpc_error(id, -32602, "token not found in infer cache");
       }
     } else if (params.contains("inference")) {
       auto& inf = params.at("inference").as_object();
@@ -252,8 +248,7 @@ class session {
       cmd_opt = std::move(cc);
       tok = next_token();
     } else {
-      return reply(
-          make_jsonrpc_error(id, -32602, "missing 'inference' or 'token'"));
+      return make_jsonrpc_error(id, -32602, "missing 'inference' or 'token'");
     }
 
     const compile_command& cmd = *cmd_opt;
@@ -271,7 +266,7 @@ class session {
       cc["compiler"] = cr.invocation.compiler;
       cc["compiler_version"] = cr.invocation.compiler_version;
       result["compilation_command"] = std::move(cc);
-      return reply(make_result(id, std::move(result)));
+      return make_result(id, std::move(result));
     }
 
     send_progress(id, "grabasm", "running");
@@ -287,13 +282,13 @@ class session {
       data["compiler_invocation"] = meta_to_json(e.invocation);
       xpto::linespan ls{e.dribble};
       data["dribble"] = json::array(ls.begin(), ls.end());
-      return reply(make_jsonrpc_error(id, -32603, e.what(), std::move(data)));
+      return make_jsonrpc_error(id, -32603, e.what(), std::move(data));
     } catch (std::exception& e) {
       auto ms = duration_ms(t0);
       send_progress(id, "grabasm", "error", ms);
       json::object data{};
       data["dribble"] = e.what();
-      return reply(make_jsonrpc_error(id, -32603, e.what(), std::move(data)));
+      return make_jsonrpc_error(id, -32603, e.what(), std::move(data));
     }
 
     auto ms = duration_ms(t0);
@@ -310,10 +305,11 @@ class session {
     cc["compiler"] = cr.invocation.compiler;
     cc["compiler_version"] = cr.invocation.compiler_version;
     result["compilation_command"] = std::move(cc);
-    reply(make_result(id, std::move(result)));
+    return make_result(id, std::move(result));
   }
 
-  void handle_annotate(const json::value& id, const json::object& params) {
+  json::object handle_annotate(
+      const json::value& id, const json::object& params) {
     const json::object* opts_ptr{nullptr};
     if (params.contains("options")) {
       opts_ptr = params.at("options").if_object();
@@ -321,8 +317,7 @@ class session {
     auto aopts = parse_aopts(opts_ptr);
 
     if (!params.contains("token") && !params.contains("asm_blob"))
-      return reply(
-          make_jsonrpc_error(id, -32602, "missing 'token' or 'asm_blob'"));
+      return make_jsonrpc_error(id, -32602, "missing 'token' or 'asm_blob'");
 
     std::optional<std::string_view> asm_blob_view{};
     std::string asm_blob_owned{};
@@ -338,7 +333,7 @@ class session {
         json::object result{it->second.annotated};
         result["token"] = tok;
         result["cached"] = "token";
-        return reply(make_result(id, std::move(result)));
+        return make_result(id, std::move(result));
       }
 
       // Fallback to the previous phase
@@ -347,8 +342,7 @@ class session {
         if (auto iit = infer_cache_1.find(tok); iit != infer_cache_1.end())
           src_path = iit->second.cmd.file;
       } else {
-        return reply(
-            make_jsonrpc_error(id, -32602, "token not found in asm cache"));
+        return make_jsonrpc_error(id, -32602, "token not found in asm cache");
       }
     } else {
       asm_blob_owned = std::string{params.at("asm_blob").as_string()};
@@ -367,7 +361,7 @@ class session {
       send_progress(id, "annotate", "error", ms);
       json::object data{};
       data["dribble"] = e.what();
-      return reply(make_jsonrpc_error(id, -32603, e.what(), std::move(data)));
+      return make_jsonrpc_error(id, -32603, e.what(), std::move(data));
     }
 
     auto ms = duration_ms(t0);
@@ -378,7 +372,62 @@ class session {
     json::object result{std::move(annotated)};
     result["token"] = tok;
     result["cached"] = false;
-    reply(make_result(id, std::move(result)));
+    return make_result(id, std::move(result));
+  }
+
+  bool handle_frame(std::string_view text) {
+    auto send = [this](auto&& msg) { static_cast<Derived*>(this)->send(msg); };
+
+    json::value msg_val{};
+    {
+      std::error_code jec{};
+      msg_val = json::parse(text, jec);
+      if (jec) {
+        send(make_jsonrpc_error(nullptr, -32700, "Parse error"));
+        return true;
+      }
+    }
+
+    auto* msg = msg_val.if_object();
+    if (!msg) {
+      send(make_jsonrpc_error(nullptr, -32600, "Invalid Request"));
+      return true;
+    }
+
+    json::value id{nullptr};
+    if (msg->contains("id")) id = msg->at("id");
+
+    if (!msg->contains("method")) {
+      send(make_jsonrpc_error(id, -32600, "missing method"));
+      return true;
+    }
+
+    std::string method{msg->at("method").as_string()};
+    const json::object* params_ptr{nullptr};
+    if (msg->contains("params")) {
+      params_ptr = msg->at("params").if_object();
+    }
+    json::object empty_params{};
+    const json::object& params = params_ptr ? *params_ptr : empty_params;
+
+    LOG_INFO("ws rpc: {}", method);
+
+    if (method == "initialize") {
+      send(handle_initialize(id, params));
+    } else if (method == "blot/infer") {
+      send(handle_infer(id, params));
+    } else if (method == "blot/grab_asm") {
+      send(handle_grabasm(id, params));
+    } else if (method == "blot/annotate") {
+      send(handle_annotate(id, params));
+    } else if (method == "shutdown") {
+      json::object result{};
+      send(make_result(id, std::move(result)));
+      return false;
+    } else {
+      send(make_jsonrpc_error(id, -32601, "Method not found"));
+    }
+    return true;
   }
 };
 
