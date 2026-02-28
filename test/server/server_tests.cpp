@@ -163,7 +163,7 @@ struct test_server {
   int port;
 
   explicit test_server(const fs::path& ccj)
-      : port{xpto::blot::run_web_server(ioc, ccj, 0)} {}
+      : port{xpto::blot::run_web_server(ioc.get_executor(), ccj, 0)} {}
 
   test_server(const test_server&) = delete;
   test_server& operator=(const test_server&) = delete;

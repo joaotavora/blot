@@ -4,6 +4,7 @@
 
 #include <CLI/CLI.hpp>
 #include <boost/asio/io_context.hpp>
+#include <boost/asio/thread_pool.hpp>
 #include <boost/json.hpp>
 #include <boost/json/array.hpp>
 #include <filesystem>
@@ -153,15 +154,15 @@ int main(int argc, char* argv[]) {
 
   if (fopts.web_mode) {
     auto ccj = ccj_or_die("--web");
-    boost::asio::io_context ioc;
-    int port = blot::run_web_server(ioc, ccj, fopts.port);
+    boost::asio::thread_pool pool{4};
+    int port = blot::run_web_server(pool.get_executor(), ccj, fopts.port);
     fmt::println("blot --web: listening on http://localhost:{}", port);
     fmt::println(
         "  project root : {}", fs::absolute(ccj).parent_path().string());
     fmt::println("  ccj          : {}", ccj.string());
     fmt::println("  press Ctrl-C to stop");
     std::cout.flush();
-    ioc.run();
+    pool.join();
     return 0;
   }
 

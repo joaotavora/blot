@@ -3,6 +3,7 @@
 
 #include <fmt/core.h>
 
+#include <atomic>
 #include <boost/asio/awaitable.hpp>
 #include <boost/asio/co_spawn.hpp>
 #include <boost/asio/detached.hpp>
@@ -17,6 +18,8 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <memory>
+#include <mutex>
 #include <optional>
 #include <sstream>
 #include <string>
@@ -39,16 +42,21 @@ namespace fs = std::filesystem;
 
 struct ws_session : session<ws_session> {
   using stream_t = beast::websocket::stream<beast::tcp_stream>;
+  stream_t ws;
+  std::mutex write_mutex;
+  std::atomic<bool> shutdown_requested{false};
+
   ws_session(
-      stream_t& ws, const fs::path& ccj_path, const fs::path& project_root)
-      : ws{&ws}, session{ccj_path, project_root} {}
+      stream_t ws, const fs::path& ccj_path, const fs::path& project_root)
+      : ws{std::move(ws)}, session{ccj_path, project_root} {}
+
   void send(const json::object& msg) {
-    beast::error_code ec{};
     auto text = json::serialize(msg);
-    ws->write(boost::asio::buffer(text), ec);
+    std::lock_guard lk{write_mutex};
+    beast::error_code ec{};
+    ws.write(boost::asio::buffer(text), ec);
     if (ec) LOG_INFO("ws_send error: {}", ec.message());
   }
-  stream_t* ws;  // NOLINT
 };
 
 /// Helpers
@@ -270,15 +278,27 @@ response_t dispatch(
   return make_error(http::status::not_found, "not found", version, keep_alive);
 }
 
+net::awaitable<void> process_frame(
+    std::shared_ptr<ws_session> sess, std::string text) {
+  if (!sess->handle_frame(text))
+    sess->shutdown_requested.store(true, std::memory_order_relaxed);
+  co_return;
+}
+
 net::awaitable<void> run_ws_session(
     websocket::stream<beast::tcp_stream> ws, fs::path ccj_path,
     fs::path project_root) {
   ws.text(true);
-  ws_session sess{ws, ccj_path, project_root};
+  auto sess =
+      std::make_shared<ws_session>(std::move(ws), ccj_path, project_root);
+  auto ex = co_await net::this_coro::executor;
   for (;;) {
+    if (sess->shutdown_requested.load(std::memory_order_relaxed)) break;
     beast::flat_buffer buf{};
-    co_await ws.async_read(buf, net::use_awaitable);
-    if (!sess.handle_frame(beast::buffers_to_string(buf.data()))) break;
+    co_await sess->ws.async_read(buf, net::use_awaitable);
+    net::co_spawn(
+        ex, process_frame(sess, beast::buffers_to_string(buf.data())),
+        net::detached);
   }
   LOG_INFO("ws session ended");
 }
@@ -330,17 +350,18 @@ net::awaitable<void> accept_loop(
   }
 }
 
-int run_web_server(net::io_context& ioc, const fs::path& ccj_path, int port) {
+int run_web_server(
+    const net::any_io_executor& ex, const fs::path& ccj_path, int port) {
   fs::path project_root = fs::absolute(ccj_path).parent_path();
 
   tcp::acceptor acceptor{
-    ioc, tcp::endpoint{tcp::v4(), static_cast<unsigned short>(port)}};
+    ex, tcp::endpoint{tcp::v4(), static_cast<unsigned short>(port)}};
   acceptor.set_option(net::socket_base::reuse_address{true});
 
   int bound_port = static_cast<int>(acceptor.local_endpoint().port());
 
   net::co_spawn(
-      ioc, accept_loop(std::move(acceptor), ccj_path, project_root),
+      ex, accept_loop(std::move(acceptor), ccj_path, project_root),
       net::detached);
   return bound_port;
 }

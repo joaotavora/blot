@@ -4,6 +4,7 @@
 #include <chrono>
 #include <cstdint>
 #include <filesystem>
+#include <mutex>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -113,6 +114,7 @@ class session {
 
   const fs::path* ccj_path;
   const fs::path* project_root;
+  mutable std::mutex cache_mutex;
   std::unordered_map<token_t, infer_entry> infer_cache_1;
   std::unordered_map<token_t, asm_entry> asm_cache_1;
   std::unordered_map<std::string, std::pair<int, asm_entry>> asm_cache_2;
@@ -146,22 +148,29 @@ class session {
     token_t tok{};
     if (params.contains("token")) {
       tok = params.at("token").as_int64();
-      if (auto it = infer_cache_1.find(tok); it != infer_cache_1.end()) {
+      std::optional<json::object> cached;
+      {
+        std::lock_guard lk{cache_mutex};
+        if (auto it = infer_cache_1.find(tok); it != infer_cache_1.end()) {
+          json::object result{};
+          result["token"] = tok;
+          result["cached"] = "token";
+          json::object inf{};
+          inf["annotation_target"] = it->second.cmd.file.string();
+          inf["compilation_command"] = it->second.cmd.command;
+          inf["compilation_directory"] = it->second.cmd.directory.string();
+          result["inference"] = std::move(inf);
+          cached = make_result(id, std::move(result));
+        }
+      }
+      if (cached) {
         send_progress(id, "infer", "cached", 0);
-        json::object result{};
-        result["token"] = tok;
-        result["cached"] = "token";
-        json::object inf{};
-        inf["annotation_target"] = it->second.cmd.file.string();
-        inf["compilation_command"] = it->second.cmd.command;
-        inf["compilation_directory"] = it->second.cmd.directory.string();
-        result["inference"] = std::move(inf);
-        return make_result(id, std::move(result));
+        return *cached;
       }
       return make_jsonrpc_error(id, -32602, "token not found in infer cache");
-    } else {
-      tok = next_token();
     }
+
+    tok = next_token();
 
     if (!params.contains("file"))
       return make_jsonrpc_error(id, -32602, "missing 'file' or 'token'");
@@ -196,7 +205,10 @@ class session {
 
     send_progress(id, "infer", "done", ms);
 
-    infer_cache_1[tok] = infer_entry{*cmd};
+    {
+      std::lock_guard lk{cache_mutex};
+      infer_cache_1[tok] = infer_entry{*cmd};
+    }
 
     json::object result{};
     result["token"] = tok;
@@ -211,64 +223,68 @@ class session {
 
   json::object handle_grabasm(
       const json::value& id, const json::object& params) {
-    std::optional<compile_command> cmd_opt{};
-
+    // Phase 1: locked cache check
+    std::optional<json::object> cached;
+    compile_command cmd;
+    std::string cache_key;
     token_t tok{};
-    if (params.contains("token")) {
-      tok = params.at("token").as_int64();
-
-      // Check asm_cache_1 first (exact token from a previous grab_asm result)
-      if (auto it = asm_cache_1.find(tok); it != asm_cache_1.end()) {
-        send_progress(id, "grabasm", "cached", 0);
-        json::object result{};
-        result["token"] = tok;
-        result["cached"] = "token";
-        json::object cc{};
-        cc["compiler"] = it->second.result.invocation.compiler;
-        cc["compiler_version"] = it->second.result.invocation.compiler_version;
-        result["compilation_command"] = std::move(cc);
-        return make_result(id, std::move(result));
-      }
-
-      // Fall back to the previous phase
-      if (auto it = infer_cache_1.find(tok); it != infer_cache_1.end()) {
-        cmd_opt = it->second.cmd;
+    {
+      std::lock_guard lk{cache_mutex};
+      if (params.contains("token")) {
+        tok = params.at("token").as_int64();
+        if (auto it = asm_cache_1.find(tok); it != asm_cache_1.end()) {
+          json::object result{};
+          result["token"] = tok;
+          result["cached"] = "token";
+          json::object cc{};
+          cc["compiler"] = it->second.result.invocation.compiler;
+          cc["compiler_version"] =
+              it->second.result.invocation.compiler_version;
+          result["compilation_command"] = std::move(cc);
+          cached = make_result(id, std::move(result));
+        } else if (auto it2 = infer_cache_1.find(tok);
+                   it2 != infer_cache_1.end()) {
+          cmd = it2->second.cmd;
+        } else {
+          return make_jsonrpc_error(
+              id, -32602, "token not found in infer cache");
+        }
+      } else if (params.contains("inference")) {
+        auto& inf = params.at("inference").as_object();
+        cmd.command = std::string{inf.at("compilation_command").as_string()};
+        cmd.directory =
+            fs::path{std::string{inf.at("compilation_directory").as_string()}};
+        if (inf.contains("annotation_target"))
+          cmd.file =
+              fs::path{std::string{inf.at("annotation_target").as_string()}};
+        tok = next_token();
       } else {
-        return make_jsonrpc_error(id, -32602, "token not found in infer cache");
+        return make_jsonrpc_error(id, -32602, "missing 'inference' or 'token'");
       }
-    } else if (params.contains("inference")) {
-      auto& inf = params.at("inference").as_object();
-      compile_command cc{};
-      cc.command = std::string{inf.at("compilation_command").as_string()};
-      cc.directory =
-          fs::path{std::string{inf.at("compilation_directory").as_string()}};
-      if (inf.contains("annotation_target"))
-        cc.file =
-            fs::path{std::string{inf.at("annotation_target").as_string()}};
-      cmd_opt = std::move(cc);
-      tok = next_token();
-    } else {
-      return make_jsonrpc_error(id, -32602, "missing 'inference' or 'token'");
+
+      if (!cached) {
+        cache_key = cmd.command + "|" + cmd.directory.string();
+        if (auto it = asm_cache_2.find(cache_key); it != asm_cache_2.end()) {
+          int cached_tok{it->second.first};
+          const auto& cr = it->second.second.result;
+          json::object result{};
+          result["token"] = cached_tok;
+          result["cached"] = "other";
+          json::object cc{};
+          cc["compiler"] = cr.invocation.compiler;
+          cc["compiler_version"] = cr.invocation.compiler_version;
+          result["compilation_command"] = std::move(cc);
+          cached = make_result(id, std::move(result));
+        }
+      }
     }
 
-    const compile_command& cmd = *cmd_opt;
-
-    // Check asm_cache_2 (keyed by command+directory)
-    std::string cache_key{cmd.command + "|" + cmd.directory.string()};
-    if (auto it = asm_cache_2.find(cache_key); it != asm_cache_2.end()) {
+    if (cached) {
       send_progress(id, "grabasm", "cached", 0);
-      int cached_tok{it->second.first};
-      const auto& cr = it->second.second.result;
-      json::object result{};
-      result["token"] = cached_tok;
-      result["cached"] = "other";
-      json::object cc{};
-      cc["compiler"] = cr.invocation.compiler;
-      cc["compiler_version"] = cr.invocation.compiler_version;
-      result["compilation_command"] = std::move(cc);
-      return make_result(id, std::move(result));
+      return *cached;
     }
 
+    // Phase 2: compile outside lock
     send_progress(id, "grabasm", "running");
     auto t0 = clock_t::now();
 
@@ -294,9 +310,13 @@ class session {
     auto ms = duration_ms(t0);
     send_progress(id, "grabasm", "done", ms);
 
+    // Phase 3: locked insert
     asm_entry entry{cr};
-    asm_cache_1[tok] = entry;
-    asm_cache_2[cache_key] = {tok, entry};
+    {
+      std::lock_guard lk{cache_mutex};
+      asm_cache_1[tok] = entry;
+      asm_cache_2[cache_key] = {tok, entry};
+    }
 
     json::object result{};
     result["token"] = tok;
@@ -319,43 +339,46 @@ class session {
     if (!params.contains("token") && !params.contains("asm_blob"))
       return make_jsonrpc_error(id, -32602, "missing 'token' or 'asm_blob'");
 
-    std::optional<std::string_view> asm_blob_view{};
-    std::string asm_blob_owned{};
+    std::string asm_blob;
     std::optional<fs::path> src_path{};
     token_t tok{};
 
     if (params.contains("token")) {
       tok = params.at("token").as_int64();
-
-      // Check annotate cache
-      if (auto it = annotate_cache_1.find(tok); it != annotate_cache_1.end()) {
-        send_progress(id, "annotate", "cached", 0);
-        json::object result{it->second.annotated};
-        result["token"] = tok;
-        result["cached"] = "token";
-        return make_result(id, std::move(result));
+      // Phase 1: locked cache check — copy assembly out before releasing lock
+      std::optional<json::object> cached;
+      {
+        std::lock_guard lk{cache_mutex};
+        if (auto it = annotate_cache_1.find(tok);
+            it != annotate_cache_1.end()) {
+          json::object result{it->second.annotated};
+          result["token"] = tok;
+          result["cached"] = "token";
+          cached = make_result(id, std::move(result));
+        } else if (auto it2 = asm_cache_1.find(tok); it2 != asm_cache_1.end()) {
+          asm_blob = it2->second.result.assembly;  // copy while locked
+          if (auto iit = infer_cache_1.find(tok); iit != infer_cache_1.end())
+            src_path = iit->second.cmd.file;
+        } else {
+          return make_jsonrpc_error(id, -32602, "token not found in asm cache");
+        }
       }
-
-      // Fallback to the previous phase
-      if (auto it = asm_cache_1.find(tok); it != asm_cache_1.end()) {
-        asm_blob_view = it->second.result.assembly;
-        if (auto iit = infer_cache_1.find(tok); iit != infer_cache_1.end())
-          src_path = iit->second.cmd.file;
-      } else {
-        return make_jsonrpc_error(id, -32602, "token not found in asm cache");
+      if (cached) {
+        send_progress(id, "annotate", "cached", 0);
+        return *cached;
       }
     } else {
-      asm_blob_owned = std::string{params.at("asm_blob").as_string()};
-      asm_blob_view = asm_blob_owned;
+      asm_blob = std::string{params.at("asm_blob").as_string()};
       tok = next_token();
     }
 
+    // Phase 2: annotate outside lock
     send_progress(id, "annotate", "running");
     auto t0 = clock_t::now();
 
     json::object annotated{};
     try {
-      annotated = annotate_to_json(*asm_blob_view, aopts, src_path);
+      annotated = annotate_to_json(asm_blob, aopts, src_path);
     } catch (std::exception& e) {
       auto ms = duration_ms(t0);
       send_progress(id, "annotate", "error", ms);
@@ -367,7 +390,11 @@ class session {
     auto ms = duration_ms(t0);
     send_progress(id, "annotate", "done", ms);
 
-    annotate_cache_1[tok] = annotate_entry{annotated};
+    // Phase 3: locked insert
+    {
+      std::lock_guard lk{cache_mutex};
+      annotate_cache_1[tok] = annotate_entry{annotated};
+    }
 
     json::object result{std::move(annotated)};
     result["token"] = tok;
