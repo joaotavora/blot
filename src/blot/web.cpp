@@ -1,11 +1,14 @@
-#include <sys/socket.h>
-#include <unistd.h>
-
-#include <atomic>
 #define BOOST_ASIO_NO_DEPRECATED
+#include "web.hpp"
+
 #include <fmt/core.h>
 
+#include <boost/asio/awaitable.hpp>
+#include <boost/asio/co_spawn.hpp>
+#include <boost/asio/detached.hpp>
 #include <boost/asio/ip/tcp.hpp>
+#include <boost/asio/thread_pool.hpp>
+#include <boost/asio/use_awaitable.hpp>
 #include <boost/beast/core.hpp>
 #include <boost/beast/http.hpp>
 #include <boost/beast/websocket.hpp>
@@ -16,12 +19,9 @@
 #include <sstream>
 #include <string>
 #include <string_view>
-#include <thread>
-#include <vector>
 
 #include "logger.hpp"
 #include "session.hpp"
-#include "web.hpp"
 #include "web_config.hpp"
 
 namespace beast = boost::beast;
@@ -51,10 +51,13 @@ struct ws_session : session<ws_session> {
 
 /// Helpers
 
-static http::response<http::string_body> make_json_response(
+using response_t = http::response<http::string_body>;
+using request_t = http::request<http::string_body>;
+
+response_t make_json_response(
     http::status status_code, const json::value& body,
     unsigned int http_version, bool keep_alive) {
-  http::response<http::string_body> res{status_code, http_version};
+  response_t res{status_code, http_version};
   res.set(http::field::content_type, "application/json");
   res.set(http::field::access_control_allow_origin, "*");
   res.keep_alive(keep_alive);
@@ -63,7 +66,7 @@ static http::response<http::string_body> make_json_response(
   return res;
 }
 
-static http::response<http::string_body> make_error(
+response_t make_error(
     http::status status_code, std::string_view message,
     unsigned int http_version, bool keep_alive) {
   json::object obj;
@@ -72,7 +75,7 @@ static http::response<http::string_body> make_error(
 }
 
 // List .c/.cpp/.h/.hpp files under project_root (relative paths).
-static std::vector<std::string> list_source_files(const fs::path& root) {
+std::vector<std::string> list_source_files(const fs::path& root) {
   std::vector<std::string> result;
   std::error_code ec;
   for (auto& entry : fs::recursive_directory_iterator(root, ec)) {
@@ -89,15 +92,14 @@ static std::vector<std::string> list_source_files(const fs::path& root) {
 
 /// Request dispatch
 
-template <typename Body, typename Allocator>
-static http::response<http::string_body> dispatch(
-    const http::request<Body, http::basic_fields<Allocator>>& req,
-    const fs::path& ccj_path, const fs::path& project_root) {
+response_t dispatch(
+    const request_t& req, const fs::path& ccj_path,
+    const fs::path& project_root) {
   const auto version = req.version();
   const bool keep_alive = req.keep_alive();
   const auto target = std::string(req.target());
 
-  // Static files (anything not under /api/)
+  // files (anything not under /api/)
   if (req.method() == http::verb::get && !target.starts_with("/api/")) {
     // Map "/" or "/index.html" → "index.html", strip leading "/"
     std::string rel = (target == "/" || target == "/index.html")
@@ -118,7 +120,7 @@ static http::response<http::string_body> dispatch(
         else if (ext == ".js")
           ct = "application/javascript";
 
-        http::response<http::string_body> res{http::status::ok, version};
+        response_t res{http::status::ok, version};
         res.set(http::field::content_type, ct);
         res.keep_alive(keep_alive);
         res.body() = {std::istreambuf_iterator<char>{f}, {}};
@@ -227,16 +229,14 @@ static http::response<http::string_body> dispatch(
   return make_error(http::status::not_found, "not found", version, keep_alive);
 }
 
-static void run_ws_session(
-    websocket::stream<beast::tcp_stream> ws, const fs::path& ccj_path,
-    const fs::path& project_root) {
-  beast::error_code ec{};
+net::awaitable<void> run_ws_session(
+    websocket::stream<beast::tcp_stream> ws, fs::path ccj_path,
+    fs::path project_root) {
   ws.text(true);
   ws_session sess{ws, ccj_path, project_root};
   for (;;) {
     beast::flat_buffer buf{};
-    ws.read(buf, ec);
-    if (ec == websocket::error::closed || ec) break;
+    co_await ws.async_read(buf, net::use_awaitable);
     if (!sess.handle_frame(beast::buffers_to_string(buf.data()))) break;
   }
   LOG_INFO("ws session ended");
@@ -244,99 +244,64 @@ static void run_ws_session(
 
 /// Connection handler
 
-static void handle_connection(
-    int socket_fd, const fs::path& ccj_path, const fs::path& project_root) {
-  // Each worker thread owns its own io_context for purely synchronous use.
-  boost::asio::io_context ioc;
-  boost::asio::ip::tcp::socket raw_sock{ioc};
-  boost::system::error_code ec;
-  raw_sock.assign(boost::asio::ip::tcp::v4(), socket_fd, ec);
-  if (ec) {
-    ::close(socket_fd);
-    return;
-  }
-
-  beast::tcp_stream stream{std::move(raw_sock)};
+net::awaitable<void> handle_connection(
+    tcp::socket socket, fs::path ccj_path, fs::path project_root) {
+  beast::tcp_stream stream{std::move(socket)};
   beast::flat_buffer buffer;
-
   for (;;) {
-    http::request<http::string_body> req;
-    http::read(stream, buffer, req, ec);
-    if (ec == http::error::end_of_stream || ec) break;
-
+    request_t req;
+    co_await http::async_read(stream, buffer, req, net::use_awaitable);
     LOG_INFO("{} {}", req.method_string(), req.target());
 
-    // WebSocket upgrade
     if (websocket::is_upgrade(req) && req.target() == "/ws") {
       websocket::stream<beast::tcp_stream> ws{std::move(stream)};
-      beast::error_code wec;
-      ws.accept(req, wec);
-      if (!wec) {
-        LOG_INFO("ws session started");
-        run_ws_session(std::move(ws), ccj_path, project_root);
-      }
-      return;  // skip shutdown below
+      co_await ws.async_accept(req, net::use_awaitable);
+      LOG_INFO("ws session started");
+      co_await run_ws_session(
+          std::move(ws), std::move(ccj_path), std::move(project_root));
+      co_return;
     }
 
     auto res = dispatch(req, ccj_path, project_root);
     LOG_INFO("→ {}", static_cast<unsigned>(res.result_int()));
-    http::write(stream, res, ec);
-    if (ec || !req.keep_alive()) break;
+    co_await http::async_write(stream, res, net::use_awaitable);
+    if (!req.keep_alive()) break;
   }
-
-  stream.socket().shutdown(boost::asio::ip::tcp::socket::shutdown_send, ec);
+  beast::error_code ec;
+  stream.socket().shutdown(tcp::socket::shutdown_send, ec);
 }
 
 /// Server loop
 
-void run_web_server(const fs::path& ccj_path, int port) {
+net::awaitable<void> accept_loop(
+    tcp::acceptor acceptor, fs::path ccj_path, fs::path project_root) {
+  for (;;) {
+    tcp::socket socket = co_await acceptor.async_accept(net::use_awaitable);
+    boost::system::error_code ec;
+    auto remote = socket.remote_endpoint(ec);
+    LOG_INFO(
+        "connection from {}:{}", ec ? "?" : remote.address().to_string(),
+        ec ? 0 : remote.port());
+    net::co_spawn(
+        acceptor.get_executor(),
+        handle_connection(std::move(socket), ccj_path, project_root),
+        net::detached);
+  }
+}
+
+int run_web_server(net::io_context& ioc, const fs::path& ccj_path, int port) {
   fs::path project_root = fs::absolute(ccj_path).parent_path();
 
-  fmt::println("blot --web: listening on http://localhost:{}", port);
-  fmt::println("  project root : {}", project_root.string());
-  fmt::println("  ccj          : {}", ccj_path.string());
-  fmt::println("  press Ctrl-C to stop");
-  std::cout.flush();
-
-  net::io_context ioc;
   tcp::acceptor acceptor{
     ioc, tcp::endpoint{tcp::v4(), static_cast<unsigned short>(port)}};
   acceptor.set_option(net::socket_base::reuse_address{true});
 
-  // Cap the live thread count to avoid unbounded growth.
-  constexpr int kMaxThreads{4};
-  std::atomic<int> active{0};
-  std::vector<std::thread> threads;
-  threads.reserve(64);
+  int bound_port = static_cast<int>(acceptor.local_endpoint().port());
 
-  for (;;) {
-    tcp::socket socket{ioc};
-    boost::system::error_code ec;
-    acceptor.accept(socket, ec);
-    if (ec) break;  // acceptor was closed (e.g. signal)
-
-    // Simple back-pressure: spin until a slot opens.
-    while (active.load() >= kMaxThreads) {
-      std::this_thread::sleep_for(std::chrono::milliseconds{5});
-    }
-
-    boost::system::error_code ec2;
-    auto remote = socket.remote_endpoint(ec2);
-    LOG_INFO(
-        "connection from {}:{}", ec2 ? "?" : remote.address().to_string(),
-        ec2 ? 0 : remote.port());
-    ++active;
-    // Transfer socket ownership into the thread via native handle.
-    int fd = socket.release();
-    threads.emplace_back([fd, &ccj_path, &project_root, &active]() {
-      handle_connection(fd, ccj_path, project_root);
-      --active;
-    });
-  }
-
-  for (auto& t : threads) {
-    if (t.joinable()) t.join();
-  }
+  net::co_spawn(
+      ioc, accept_loop(std::move(acceptor), ccj_path, project_root),
+      net::detached);
+  return bound_port;
 }
 
 }  // namespace xpto::blot

@@ -3,6 +3,7 @@
 #include <unistd.h>
 
 #include <CLI/CLI.hpp>
+#include <boost/asio/io_context.hpp>
 #include <boost/json.hpp>
 #include <boost/json/array.hpp>
 #include <filesystem>
@@ -144,12 +145,23 @@ int main(int argc, char* argv[]) {
   };
 
   if (fopts.stdio_mode) {
-    blot::run_stdio_server(ccj_or_die("--stdio"));
+    boost::asio::io_context ioc;
+    blot::run_stdio_server(ioc, ccj_or_die("--stdio"));
+    ioc.run();
     return 0;
   }
 
   if (fopts.web_mode) {
-    blot::run_web_server(ccj_or_die("--web"), fopts.port);
+    auto ccj = ccj_or_die("--web");
+    boost::asio::io_context ioc;
+    int port = blot::run_web_server(ioc, ccj, fopts.port);
+    fmt::println("blot --web: listening on http://localhost:{}", port);
+    fmt::println(
+        "  project root : {}", fs::absolute(ccj).parent_path().string());
+    fmt::println("  ccj          : {}", ccj.string());
+    fmt::println("  press Ctrl-C to stop");
+    std::cout.flush();
+    ioc.run();
     return 0;
   }
 

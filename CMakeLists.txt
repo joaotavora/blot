@@ -51,12 +51,22 @@ configure_file(
     @ONLY
 )
 
-# Main executable
+# Web/session server library (shared between blot_exe and test_blot_server)
+add_library(blot_server_lib src/blot/web.cpp)
+target_include_directories(blot_server_lib PUBLIC
+  include src/blot src/libblot ${CMAKE_CURRENT_BINARY_DIR})
+target_link_libraries(blot_server_lib PUBLIC
+  blot_lib
+  Boost::headers
+)
+
+# Main executable (all src/blot/*.cpp except web.cpp, which is in blot_server_lib)
 file(GLOB blot_sources CONFIGURE_DEPENDS src/blot/*.cpp)
+list(REMOVE_ITEM blot_sources "${CMAKE_CURRENT_SOURCE_DIR}/src/blot/web.cpp")
 add_executable(blot_exe ${blot_sources})
 target_include_directories(blot_exe PRIVATE include src/blot src/libblot ${CMAKE_CURRENT_BINARY_DIR})
 target_link_libraries(blot_exe PRIVATE
-  blot_lib
+  blot_server_lib
   CLI11::CLI11
   Boost::headers
 )
@@ -78,6 +88,17 @@ enable_testing()
 # Use doctest's test discovery to register individual test cases
 include(doctest)
 doctest_discover_tests(test_blot)
+
+# Server tests (in-process, no subprocess)
+add_executable(test_blot_server test/server/server_tests.cpp)
+target_link_libraries(test_blot_server PRIVATE
+  blot_server_lib
+  doctest::doctest
+)
+target_compile_definitions(test_blot_server PRIVATE
+  TEST_FIXTURE_DIR="${CMAKE_SOURCE_DIR}/test/fixture"
+)
+doctest_discover_tests(test_blot_server)
 
 # Add system tests for blot executable
 include(test/cli/system-tests.cmake)

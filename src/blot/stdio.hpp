@@ -1,5 +1,6 @@
 #pragma once
 
+#include <boost/asio/io_context.hpp>
 #include <filesystem>
 
 namespace xpto::blot {
@@ -8,6 +9,7 @@ namespace xpto::blot {
 // stdin and writes responses to stdout.  Blocks until the client sends
 // "shutdown" or stdin reaches EOF.  ccj_path must point to a valid
 // compile_commands.json file.
-void run_stdio_server(const std::filesystem::path& ccj_path);
+void run_stdio_server(
+    boost::asio::io_context& ioc, const std::filesystem::path& ccj_path);
 
 }  // namespace xpto::blot

@@ -1,11 +1,15 @@
 #pragma once
 
+#include <boost/asio/io_context.hpp>
 #include <filesystem>
 
 namespace xpto::blot {
 
-// Start the HTTP server. Blocks until the process receives SIGINT/SIGTERM.
-// ccj_path must point to a valid compile_commands.json file.
-void run_web_server(const std::filesystem::path& ccj_path, int port);
+// Set up the HTTP server: bind to port, co_spawn the accept loop.
+// Returns the actual bound port (useful when port=0 for auto-assignment).
+// Does NOT call ioc.run() — the caller is responsible for that.
+int run_web_server(
+    boost::asio::io_context& ioc, const std::filesystem::path& ccj_path,
+    int port);
 
 }  // namespace xpto::blot
