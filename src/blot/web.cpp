@@ -13,9 +13,11 @@
 #include <boost/beast/http.hpp>
 #include <boost/beast/websocket.hpp>
 #include <boost/json.hpp>
+#include <cstdio>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <optional>
 #include <sstream>
 #include <string>
 #include <string_view>
@@ -74,15 +76,54 @@ response_t make_error(
   return make_json_response(status_code, obj, http_version, keep_alive);
 }
 
-// List .c/.cpp/.h/.hpp files under project_root (relative paths).
+static const std::array kSrcExts{
+  std::string_view{".c"}, std::string_view{".cpp"}, std::string_view{".h"},
+  std::string_view{".hpp"}};
+
+static bool is_source_file(const fs::path& p) {
+  auto ext = p.extension();
+  return std::any_of(
+      kSrcExts.begin(), kSrcExts.end(), [&](auto e) { return ext == e; });
+}
+
+// Try to list source files via `git ls-files` (respects .gitignore).
+// Returns nullopt if git is unavailable or exits non-zero.
+static std::optional<std::vector<std::string>> try_git_ls_files(
+    const fs::path& root) {
+  std::string cmd = "git -C \"" + root.string() + "\" ls-files 2>/dev/null";
+  FILE* pipe = popen(cmd.c_str(), "r");  // NOLINT(cert-env33-c)
+  if (!pipe) return std::nullopt;
+  std::string output;
+  std::array<char, 4096> buf{};
+  while (fgets(buf.data(), buf.size(), pipe)) output += buf.data();
+  if (pclose(pipe) != 0) return std::nullopt;
+  std::vector<std::string> result;
+  std::istringstream ss{output};
+  std::string line;
+  while (std::getline(ss, line)) {
+    if (!line.empty() && line.back() == '\r') line.pop_back();
+    if (!line.empty() && is_source_file(line))
+      result.push_back(std::move(line));
+  }
+  return result;
+}
+
+// List .c/.cpp/.h/.hpp files under root.
+// Uses git ls-files when a .git directory is present, otherwise walks the tree.
 std::vector<std::string> list_source_files(const fs::path& root) {
+  if (fs::exists(root / ".git")) {
+    if (auto files = try_git_ls_files(root)) {
+      std::sort(files->begin(), files->end());
+      return std::move(*files);
+    }
+  }
+  // Fallback: recursive directory walk
   std::vector<std::string> result;
   std::error_code ec;
   for (auto& entry : fs::recursive_directory_iterator(root, ec)) {
     if (ec) break;
     if (!entry.is_regular_file()) continue;
-    auto ext = entry.path().extension();
-    if (ext != ".c" && ext != ".cpp" && ext != ".h" && ext != ".hpp") continue;
+    if (!is_source_file(entry.path())) continue;
     auto rel = fs::relative(entry.path(), root, ec);
     if (!ec) result.push_back(rel.string());
   }
