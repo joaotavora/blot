@@ -7,12 +7,15 @@
 #include <boost/asio/detached.hpp>
 #include <boost/asio/ip/tcp.hpp>
 #include <boost/asio/this_coro.hpp>
+#include <boost/asio/thread_pool.hpp>
 #include <boost/asio/use_awaitable.hpp>
 #include <boost/beast/core.hpp>
 #include <boost/beast/http.hpp>
+#include <boost/beast/websocket.hpp>
 #include <boost/json.hpp>
 #include <deque>
 #include <filesystem>
+#include <map>
 #include <stdexcept>
 #include <string>
 #include <string_view>
@@ -157,6 +160,23 @@ static std::tuple<int64_t, int64_t, int64_t> run_pipeline(test_session& sess) {
 
 }  // namespace xpto::blot
 
+// Server on a thread_pool — exercises true concurrent dispatch.
+struct ws_test_server {
+  net::thread_pool pool{4};
+  int port;
+
+  explicit ws_test_server(const fs::path& ccj)
+      : port{xpto::blot::run_web_server(pool.get_executor(), ccj, 0)} {}
+
+  ws_test_server(const ws_test_server&) = delete;
+  ws_test_server& operator=(const ws_test_server&) = delete;
+
+  ~ws_test_server() {
+    pool.stop();
+    pool.join();
+  }
+};
+
 // Owns the io_context and server setup. Caller drives it via ioc.run().
 struct test_server {
   net::io_context ioc;
@@ -168,6 +188,20 @@ struct test_server {
   test_server(const test_server&) = delete;
   test_server& operator=(const test_server&) = delete;
 };
+
+// Run a WS test coroutine on its own io_context while the server runs on
+// the thread pool. Rethrows any exception so doctest failures propagate.
+template <typename Coro>
+static void run_ws_test(ws_test_server& /*srv*/, Coro coro) {
+  net::io_context ioc;
+  std::exception_ptr ep;
+  net::co_spawn(ioc, std::move(coro), [&ep, &ioc](std::exception_ptr e) {
+    ep = e;
+    ioc.stop();
+  });
+  ioc.run();
+  if (ep) std::rethrow_exception(ep);
+}
 
 // Run a test coroutine on ioc alongside the server. Stops ioc on completion
 // and rethrows any exception (so doctest REQUIRE failures propagate).
@@ -646,5 +680,102 @@ TEST_CASE("server_http_files_source_not_found") {
     auto resp = co_await xpto::blot::async_http_get(
         srv.port, "/api/source?file=does_not_exist.cpp");
     CHECK(resp.status == 404);
+  }());
+}
+
+/// WebSocket helpers
+
+// Read from ws, skipping blot/progress notifications, until we get a
+// JSONRPC response (has "id" but no "method").
+static net::awaitable<json::object> ws_recv_response(
+    beast::websocket::stream<beast::tcp_stream>& ws) {
+  for (;;) {
+    beast::flat_buffer buf{};
+    co_await ws.async_read(buf, net::use_awaitable);
+    auto msg = json::parse(beast::buffers_to_string(buf.data())).as_object();
+    if (!msg.contains("method")) co_return msg;
+  }
+}
+
+// Read from ws until responses for exactly n distinct ids are collected.
+// Notifications are skipped. Returns map from id to full response object.
+static net::awaitable<std::map<int64_t, json::object>> ws_recv_n_responses(
+    beast::websocket::stream<beast::tcp_stream>& ws, int n) {
+  std::map<int64_t, json::object> out;
+  while (static_cast<int>(out.size()) < n) {
+    beast::flat_buffer buf{};
+    co_await ws.async_read(buf, net::use_awaitable);
+    auto msg = json::parse(beast::buffers_to_string(buf.data())).as_object();
+    if (msg.contains("method")) continue;
+    out[msg.at("id").as_int64()] = msg;
+  }
+  co_return out;
+}
+
+/// Concurrency tests
+
+TEST_CASE("server_ws_concurrent_grab_asm") {
+  // The server runs on a real thread pool; the test client runs on its
+  // own io_context and communicates over TCP — the actual interface.
+  auto dir = xpto::blot::fixture_dir("gcc-minimal");
+  fs::current_path(dir);
+  auto ccj = dir / "compile_commands.json";
+  ws_test_server srv{ccj};
+
+  run_ws_test(srv, [&]() -> net::awaitable<void> {
+    auto ex = co_await net::this_coro::executor;
+
+    // Connect WebSocket
+    tcp::resolver resolver{ex};
+    beast::tcp_stream tcp_s{ex};
+    auto ep = co_await resolver.async_resolve(
+        "127.0.0.1", std::to_string(srv.port), net::use_awaitable);
+    co_await tcp_s.async_connect(ep, net::use_awaitable);
+    beast::websocket::stream<beast::tcp_stream> ws{std::move(tcp_s)};
+    co_await ws.async_handshake("127.0.0.1", "/ws", net::use_awaitable);
+    ws.text(true);
+
+    auto send_req = [&ws](
+                        int id, std::string_view method,
+                        json::object params) -> net::awaitable<void> {
+      json::object req{};
+      req["jsonrpc"] = "2.0";
+      req["id"] = id;
+      req["method"] = method;
+      req["params"] = std::move(params);
+      co_await ws.async_write(
+          net::buffer(json::serialize(req)), net::use_awaitable);
+    };
+
+    // Bootstrap: initialize + infer to get a token
+    co_await send_req(1, "initialize", {});
+    co_await ws_recv_response(ws);
+
+    json::object infer_p{};
+    infer_p["file"] = "source.cpp";
+    co_await send_req(2, "blot/infer", infer_p);
+    auto infer_resp = co_await ws_recv_response(ws);
+    REQUIRE(!infer_resp.contains("error"));
+    auto token = infer_resp.at("result").as_object().at("token").as_int64();
+
+    // Fire N grab_asm requests back-to-back without reading any response.
+    // The server co_spawns each as a separate coroutine on the thread pool,
+    // so all N compilations (or cache lookups) can run concurrently.
+    constexpr int N = 4;
+    for (int i = 0; i < N; ++i) {
+      json::object p{};
+      p["token"] = token;
+      co_await send_req(10 + i, "blot/grab_asm", p);
+    }
+
+    // Collect all N responses in whatever order they arrive
+    auto resps = co_await ws_recv_n_responses(ws, N);
+    REQUIRE(static_cast<int>(resps.size()) == N);
+    for (int i = 0; i < N; ++i) {
+      int64_t id{10 + i};
+      REQUIRE(resps.count(id));
+      CHECK(!resps.at(id).contains("error"));
+      CHECK(resps.at(id).at("result").as_object().contains("token"));
+    }
   }());
 }
