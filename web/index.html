@@ -101,8 +101,19 @@ body {
   padding: 4px 12px 8px;
 }
 
+.filetree-dir {
+  padding: 8px 12px 2px;
+  font-size: 0.72rem;
+  font-family: 'Fira Code', 'Consolas', monospace;
+  color: #506878;
+  user-select: none;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .filetree-item {
-  padding: 5px 12px;
+  padding: 3px 12px 3px 20px;
   font-size: 0.8rem;
   cursor: pointer;
   white-space: nowrap;
@@ -119,6 +130,20 @@ body {
   color: #e0e8f0;
   font-weight: 600;
 }
+
+.filetree-filter { padding: 0 8px 6px; }
+
+.filter-input {
+  width: 100%;
+  background: #0d1b2e;
+  border: 1px solid #1e3a5f;
+  border-radius: 3px;
+  color: #9ab0c8;
+  font-size: 0.8rem;
+  padding: 4px 8px;
+  outline: none;
+}
+.filter-input:focus { border-color: #3a6aaf; }
 
 /* Editor panels */
 .panels {
@@ -162,10 +187,10 @@ body {
   border-collapse: collapse;
   font-family: 'Fira Code', 'Consolas', monospace;
   font-size: 0.82rem;
-  line-height: 1.5;
+  line-height: 20px;  /* fixed px — must match ROW_H constant in JS */
 }
 
-.code-table tr { transition: background 0.05s; }
+.code-table tr { height: 20px; transition: background 0.05s; cursor: pointer; }
 
 .line-num {
   width: 3.5em;
@@ -264,6 +289,34 @@ body {
   text-overflow: ellipsis;
   flex-shrink: 0;
 }
+
+/* Scrollbars — thin, invisible until the panel is hovered */
+.panel-body, .filetree {
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+  transition: scrollbar-color 0.3s;
+}
+.panel-body:hover, .filetree:hover {
+  scrollbar-color: #1e3a5f transparent;
+}
+
+.panel-body::-webkit-scrollbar,
+.filetree::-webkit-scrollbar { width: 6px; height: 6px; }
+
+.panel-body::-webkit-scrollbar-track,
+.filetree::-webkit-scrollbar-track { background: transparent; }
+
+.panel-body::-webkit-scrollbar-thumb,
+.filetree::-webkit-scrollbar-thumb {
+  background: transparent;
+  border-radius: 3px;
+  transition: background 0.3s;
+}
+.panel-body:hover::-webkit-scrollbar-thumb,
+.filetree:hover::-webkit-scrollbar-thumb { background: #1e3a5f; }
+
+.panel-body::-webkit-scrollbar-thumb:hover,
+.filetree::-webkit-scrollbar-thumb:hover { background: #2d5a8e; }
 </style>
 </head>
 <body>
@@ -287,14 +340,19 @@ body {
     <!-- File tree -->
     <div class="filetree">
       <div class="filetree-header">Files</div>
+      <div class="filetree-filter">
+        <input class="filter-input" v-model="filterQuery" placeholder="filter…" type="text" spellcheck="false">
+      </div>
       <div v-if="!files.length" class="loading">loading…</div>
-      <div
-        v-for="f in files" :key="f"
-        class="filetree-item"
-        :class="{active: f === selectedFile}"
-        :title="f"
-        @click="selectFile(f)"
-      >{{ basename(f) }}</div>
+      <template v-for="item in fileTree" :key="item.type === 'dir' ? 'd:' + item.label : item.path">
+        <div v-if="item.type === 'dir'" class="filetree-dir" :title="item.label">{{ item.label }}</div>
+        <div v-else
+          class="filetree-item"
+          :class="{active: item.path === selectedFile}"
+          :title="item.path"
+          @click="selectFile(item.path)"
+        >{{ item.name }}</div>
+      </template>
     </div>
 
     <!-- Source + Assembly panels -->
@@ -303,21 +361,24 @@ body {
       <!-- Source panel -->
       <div class="panel">
         <div class="panel-header">Source <span v-if="selectedFile">— {{ basename(selectedFile) }}</span></div>
-        <div class="panel-body" ref="srcPanel">
+        <div class="panel-body" ref="srcPanel" @scroll="onSrcScroll">
           <div v-if="loadingSource" class="loading">loading…</div>
           <div v-else-if="!sourceLines.length" class="loading">select a file</div>
           <table class="code-table" v-else>
             <tbody>
+              <tr v-if="srcPadTop" :style="{height: srcPadTop + 'px'}"><td colspan="2"></td></tr>
               <tr
-                v-for="(line, i) in sourceLines"
-                :key="i"
-                :class="srcRowClass(i+1)"
-                @mouseenter="hoveredSourceLine = i+1"
+                v-for="(html, vi) in srcVisibleHtml"
+                :key="srcOffset + vi"
+                :class="srcRowClass(srcOffset + vi + 1)"
+                @mouseenter="hoveredSourceLine = srcOffset + vi + 1"
                 @mouseleave="hoveredSourceLine = 0"
+                @click="clickSrcLine(srcOffset + vi + 1)"
               >
-                <td class="line-num">{{ i+1 }}</td>
-                <td class="line-code" v-html="hlCpp(line)"></td>
+                <td class="line-num">{{ srcOffset + vi + 1 }}</td>
+                <td class="line-code" v-html="html"></td>
               </tr>
+              <tr v-if="srcPadBot" :style="{height: srcPadBot + 'px'}"><td colspan="2"></td></tr>
             </tbody>
           </table>
         </div>
@@ -340,22 +401,25 @@ body {
           </span>
         </div>
 
-        <div class="panel-body" ref="asmPanel">
+        <div class="panel-body" ref="asmPanel" @scroll="onAsmScroll">
           <div v-if="loadingAsm" class="loading">annotating…</div>
           <div v-else-if="asmError" class="error-msg">{{ asmError }}</div>
           <div v-else-if="!asmLines.length" class="loading">select a file</div>
           <table class="code-table" v-else>
             <tbody>
+              <tr v-if="asmPadTop" :style="{height: asmPadTop + 'px'}"><td colspan="2"></td></tr>
               <tr
-                v-for="(line, i) in asmLines"
-                :key="i"
-                :class="asmRowClass(i+1)"
-                @mouseenter="hoveredAsmLine = i+1"
+                v-for="(html, vi) in asmVisibleHtml"
+                :key="asmOffset + vi"
+                :class="asmRowClass(asmOffset + vi + 1)"
+                @mouseenter="hoveredAsmLine = asmOffset + vi + 1"
                 @mouseleave="hoveredAsmLine = 0"
+                @click="clickAsmLine(asmOffset + vi + 1)"
               >
-                <td class="line-num">{{ i+1 }}</td>
-                <td class="line-code" v-html="hlAsm(line)"></td>
+                <td class="line-num">{{ asmOffset + vi + 1 }}</td>
+                <td class="line-code" v-html="html"></td>
               </tr>
+              <tr v-if="asmPadBot" :style="{height: asmPadBot + 'px'}"><td colspan="2"></td></tr>
             </tbody>
           </table>
         </div>
@@ -414,6 +478,24 @@ class BlotWS {
   close() { this._ws.close(); }
 }
 
+// Returns the longest common directory prefix across all file paths.
+function commonPathPrefix(paths) {
+  const dirs = paths.map(p => p.split('/').slice(0, -1));
+  const first = dirs[0];
+  let i = 0;
+  while (i < first.length && dirs.every(d => d[i] === first[i])) i++;
+  return first.slice(0, i).join('/');
+}
+
+// Scatter/fuzzy match: every character of query must appear in text, in order.
+function scatterMatch(query, text) {
+  const q = query.toLowerCase(), t = text.toLowerCase();
+  let qi = 0;
+  for (let i = 0; i < t.length && qi < q.length; i++)
+    if (t[i] === q[qi]) qi++;
+  return qi === q.length;
+}
+
 // Vue app
 
 createApp({
@@ -458,21 +540,24 @@ createApp({
     let blotWS = null;
 
     // Computed: highlight maps
+    // Color is assigned per unique source line (first seen), so asm ranges
+    // generated from the same source line always share its color.
     const srcColorMap = computed(() => {
       const m = new Map();
-      lineMappings.value.forEach((lm, idx) => {
-        m.set(lm.source_line, idx % 10);
-      });
+      let next = 0;
+      for (const lm of lineMappings.value)
+        if (!m.has(lm.source_line)) m.set(lm.source_line, next++ % 10);
       return m;
     });
 
     const asmColorMap = computed(() => {
+      const sc = srcColorMap.value;
       const m = new Map();
-      lineMappings.value.forEach((lm, idx) => {
-        for (let l = lm.asm_start; l <= lm.asm_end; l++) {
-          m.set(l, idx % 10);
-        }
-      });
+      for (const lm of lineMappings.value) {
+        const ci = sc.get(lm.source_line);
+        if (ci !== undefined)
+          for (let l = lm.asm_start; l <= lm.asm_end; l++) m.set(l, ci);
+      }
       return m;
     });
 
@@ -497,6 +582,62 @@ createApp({
       }
       return s;
     });
+
+    // Pre-computed syntax-highlighted HTML (runs hljs once per file load, not per hover)
+    const sourceHtml = computed(() => sourceLines.value.map(line => hlCpp(line)));
+    const asmHtml    = computed(() => asmLines.value.map(line => hlAsm(line)));
+
+    // Virtual scroll — only render what's visible in the viewport
+    const ROW_H   = 20;   // must match CSS line-height on .code-table
+    const OVERSCAN = 30;  // extra rows rendered above/below the visible window
+
+    const srcPanel = ref(null);
+    const asmPanel = ref(null);
+    const srcScrollTop = ref(0);
+    const asmScrollTop = ref(0);
+    const srcPanelH = ref(800);
+    const asmPanelH = ref(800);
+
+    const srcOffset = computed(() =>
+      Math.max(0, Math.floor(srcScrollTop.value / ROW_H) - OVERSCAN));
+    const srcEnd = computed(() =>
+      Math.min(sourceHtml.value.length,
+        Math.ceil((srcScrollTop.value + srcPanelH.value) / ROW_H) + OVERSCAN));
+    const srcVisibleHtml = computed(() =>
+      sourceHtml.value.slice(srcOffset.value, srcEnd.value));
+    const srcPadTop = computed(() => srcOffset.value * ROW_H);
+    const srcPadBot = computed(() =>
+      Math.max(0, (sourceHtml.value.length - srcEnd.value) * ROW_H));
+
+    const asmOffset = computed(() =>
+      Math.max(0, Math.floor(asmScrollTop.value / ROW_H) - OVERSCAN));
+    const asmEnd = computed(() =>
+      Math.min(asmHtml.value.length,
+        Math.ceil((asmScrollTop.value + asmPanelH.value) / ROW_H) + OVERSCAN));
+    const asmVisibleHtml = computed(() =>
+      asmHtml.value.slice(asmOffset.value, asmEnd.value));
+    const asmPadTop = computed(() => asmOffset.value * ROW_H);
+    const asmPadBot = computed(() =>
+      Math.max(0, (asmHtml.value.length - asmEnd.value) * ROW_H));
+
+    function onSrcScroll(e) { srcScrollTop.value = e.target.scrollTop; }
+    function onAsmScroll(e) { asmScrollTop.value = e.target.scrollTop; }
+
+    function scrollToLine(panel, scrollTopRef, panelHRef, lineNum) {
+      const top = Math.max(0, (lineNum - 1) * ROW_H - panelHRef.value / 2 + ROW_H / 2);
+      panel.value.scrollTop = top;
+      scrollTopRef.value = top;
+    }
+
+    function clickSrcLine(lineNum) {
+      const lm = lineMappings.value.find(m => m.source_line === lineNum);
+      if (lm) scrollToLine(asmPanel, asmScrollTop, asmPanelH, lm.asm_start);
+    }
+
+    function clickAsmLine(lineNum) {
+      const lm = lineMappings.value.find(m => lineNum >= m.asm_start && lineNum <= m.asm_end);
+      if (lm) scrollToLine(srcPanel, srcScrollTop, srcPanelH, lm.source_line);
+    }
 
     // Row class helpers
     function srcRowClass(lineNum) {
@@ -531,6 +672,32 @@ createApp({
     function escHtml(s) {
       return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
     }
+
+    const filterQuery = ref('');
+
+    // File tree: group files by directory, optionally filtered by scatter match
+    const fileTree = computed(() => {
+      if (!files.value.length) return [];
+      const prefix = commonPathPrefix(files.value);
+      const q = filterQuery.value.trim();
+      const groups = new Map();
+      for (const f of files.value) {
+        const rel = f.slice(prefix.length).replace(/^\//, '');
+        const slash = rel.lastIndexOf('/');
+        const dir  = slash >= 0 ? rel.slice(0, slash) : '';
+        const name = slash >= 0 ? rel.slice(slash + 1) : rel;
+        if (q && !scatterMatch(q, rel)) continue;
+        if (!groups.has(dir)) groups.set(dir, []);
+        groups.get(dir).push({ path: f, name });
+      }
+      const items = [];
+      for (const [dir, list] of [...groups.entries()].sort((a, b) => a[0].localeCompare(b[0]))) {
+        items.push({ type: 'dir', label: dir || '.' });
+        for (const f of list.sort((a, b) => a.name.localeCompare(b.name)))
+          items.push({ type: 'file', ...f });
+      }
+      return items;
+    });
 
     // Helpers
     function basename(p) {
@@ -603,6 +770,10 @@ createApp({
     async function selectFile(f) {
       selectedFile.value = f;
       sourceLines.value = [];
+      srcScrollTop.value = 0;
+      asmScrollTop.value = 0;
+      if (srcPanel.value) srcPanel.value.scrollTop = 0;
+      if (asmPanel.value) asmPanel.value.scrollTop = 0;
       asmLines.value = [];
       lineMappings.value = [];
       asmError.value = '';
@@ -692,6 +863,14 @@ createApp({
     // Init
     onMounted(async () => {
       blotWS = new BlotWS(onProgress);
+      const ro = new ResizeObserver(entries => {
+        for (const e of entries) {
+          if (e.target === srcPanel.value) srcPanelH.value = e.contentRect.height;
+          if (e.target === asmPanel.value) asmPanelH.value = e.contentRect.height;
+        }
+      });
+      if (srcPanel.value) ro.observe(srcPanel.value);
+      if (asmPanel.value) ro.observe(asmPanel.value);
       await fetchStatus();
       await fetchFiles();
       try {
@@ -703,13 +882,15 @@ createApp({
 
     return {
       status, statusError, statusRoot,
-      files, selectedFile,
+      files, fileTree, filterQuery, selectedFile,
       sourceLines, loadingSource,
+      srcPanel, srcVisibleHtml, srcOffset, srcPadTop, srcPadBot, onSrcScroll,
       asmLines, lineMappings, loadingAsm, asmError, compilerInfo,
+      asmPanel, asmVisibleHtml, asmOffset, asmPadTop, asmPadBot, onAsmScroll,
       hoveredSourceLine, hoveredAsmLine,
       opts, phases,
       srcRowClass, asmRowClass,
-      hlCpp, hlAsm,
+      clickSrcLine, clickAsmLine,
       basename, optLabel, phaseLabel,
       selectFile, reannotate,
     };
