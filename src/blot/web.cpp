@@ -40,7 +40,7 @@ namespace xpto::blot {
 
 namespace fs = std::filesystem;
 
-struct ws_session : session<ws_session> {
+struct ws_session : session {
   using stream_t = beast::websocket::stream<beast::tcp_stream>;
   stream_t ws;
   std::mutex write_mutex;
@@ -50,7 +50,7 @@ struct ws_session : session<ws_session> {
       stream_t ws, const fs::path& ccj_path, const fs::path& project_root)
       : ws{std::move(ws)}, session{ccj_path, project_root} {}
 
-  void send(const json::object& msg) {
+  void send(const json::object& msg) override {
     auto text = json::serialize(msg);
     std::lock_guard lk{write_mutex};
     beast::error_code ec{};

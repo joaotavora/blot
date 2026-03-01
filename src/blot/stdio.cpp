@@ -26,11 +26,11 @@ namespace xpto::blot {
 
 namespace fs = std::filesystem;
 
-struct stdio_session : session<stdio_session> {
+struct stdio_session : session {
   stdio_session(const fs::path& ccj_path, const fs::path& project_root)
       : session{ccj_path, project_root} {}
 
-  void send(const json::object& msg) {
+  void send(const json::object& msg) override {
     auto text = json::serialize(msg);
     std::cout << "Content-Length: " << text.size() << "\r\n\r\n" << text;
     std::cout.flush();

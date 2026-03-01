@@ -47,13 +47,13 @@ struct jsonrpc_error : std::runtime_error {
         message{err.at("message").as_string()} {}
 };
 
-struct test_session : session<test_session> {
+struct test_session : session {
   std::deque<json::object> outbox;
 
   test_session(const fs::path& ccj, const fs::path& root)
-      : session<test_session>{ccj, root} {}
+      : session{ccj, root} {}
 
-  void send(const json::object& msg) { outbox.push_back(msg); }
+  void send(const json::object& msg) override { outbox.push_back(msg); }
 
   // Serialize and dispatch a JSONRPC request; return the result object.
   // Throws jsonrpc_error if the response contains an "error" field.

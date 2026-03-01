@@ -58,7 +58,7 @@ configure_file(
 )
 
 # Web/session server library (shared between blot_exe and test_blot_server)
-add_library(blot_server_lib src/blot/web.cpp)
+add_library(blot_server_lib src/blot/web.cpp src/blot/session.cpp)
 target_include_directories(blot_server_lib PUBLIC
   include src/blot src/libblot ${CMAKE_CURRENT_BINARY_DIR})
 target_link_libraries(blot_server_lib PUBLIC
@@ -66,9 +66,12 @@ target_link_libraries(blot_server_lib PUBLIC
   Boost::headers
 )
 
-# Main executable (all src/blot/*.cpp except web.cpp, which is in blot_server_lib)
+# Main executable (all src/blot/*.cpp except web.cpp and session.cpp, which are in blot_server_lib)
 file(GLOB blot_sources CONFIGURE_DEPENDS src/blot/*.cpp)
-list(REMOVE_ITEM blot_sources "${CMAKE_CURRENT_SOURCE_DIR}/src/blot/web.cpp")
+list(REMOVE_ITEM blot_sources
+  "${CMAKE_CURRENT_SOURCE_DIR}/src/blot/web.cpp"
+  "${CMAKE_CURRENT_SOURCE_DIR}/src/blot/session.cpp"
+)
 add_executable(blot_exe ${blot_sources})
 target_include_directories(blot_exe PRIVATE include src/blot src/libblot ${CMAKE_CURRENT_BINARY_DIR})
 target_link_libraries(blot_exe PRIVATE
