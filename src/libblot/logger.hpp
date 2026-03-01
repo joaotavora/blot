@@ -1,7 +1,7 @@
 #pragma once
 
 #include <fmt/base.h>
-#include <fmt/format.h>
+#include <fmt/chrono.h>
 
 #include <chrono>
 #include <cstdint>
@@ -32,11 +32,9 @@ inline level global_level = level::info;  // NOLINT
 inline void set_level(level level) { global_level = level; }
 
 inline std::string get_current_timestamp() {
-  using namespace std::chrono;
-  auto now = system_clock::now();
-  auto ymd = year_month_day{floor<days>(now)};
-  auto hms = hh_mm_ss{floor<milliseconds>(now - floor<days>(now))};
-  return std::format("{} {}", ymd, hms);
+  auto now = std::chrono::floor<std::chrono::milliseconds>(
+      std::chrono::system_clock::now());
+  return fmt::format("{:%Y-%m-%d %H:%M:%S}", now);
 }
 
 // Core logging function
