@@ -18,6 +18,18 @@
       }
     },
     {
+      "name": "clang",
+      "displayName": "Clang Build (for -ftime-trace profiling)",
+      "binaryDir": "${sourceDir}/build-Clang",
+      "inherits": "dev",
+      "cacheVariables": {
+        "CMAKE_C_COMPILER": "clang",
+        "CMAKE_CXX_COMPILER": "clang++",
+        "CMAKE_CXX_FLAGS": "-ftime-trace"
+
+      }
+    },
+    {
       "name": "conan-dev",
       "displayName": "Conan Development Build",
       "inherits": "dev",
