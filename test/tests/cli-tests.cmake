@@ -5,7 +5,7 @@
 add_test(
     NAME cli_gcc_basic
     COMMAND ${CMAKE_SOURCE_DIR}/test/util/blot-and-compare.sh
-        $<TARGET_FILE:blot_exe>
+        $<TARGET_FILE:blot_cli_exe>
         ${CMAKE_SOURCE_DIR}/test/fixture/gcc-basic/compile_commands.json
         ${CMAKE_SOURCE_DIR}/test/fixture/gcc-basic/source.cpp
         ${CMAKE_SOURCE_DIR}/test/fixture/gcc-basic/expected.json
@@ -16,7 +16,7 @@ add_test(
     NAME cli_gcc_stdin_basic
     COMMAND ${CMAKE_SOURCE_DIR}/test/util/blot-and-compare.sh
         --stdin
-        $<TARGET_FILE:blot_exe>
+        $<TARGET_FILE:blot_cli_exe>
         ${CMAKE_SOURCE_DIR}/test/fixture/gcc-basic/compile_commands.json
         ${CMAKE_SOURCE_DIR}/test/fixture/gcc-basic/source.cpp
         ${CMAKE_SOURCE_DIR}/test/fixture/gcc-basic/expected.json
@@ -27,7 +27,7 @@ add_test(
     NAME cli_gcc_preserve_library_functions
     COMMAND ${CMAKE_SOURCE_DIR}/test/util/blot-and-compare.sh
         -pl
-        $<TARGET_FILE:blot_exe>
+        $<TARGET_FILE:blot_cli_exe>
         ${CMAKE_SOURCE_DIR}/test/fixture/gcc-preserve-library-functions/compile_commands.json
         ${CMAKE_SOURCE_DIR}/test/fixture/gcc-preserve-library-functions/source.cpp
         ${CMAKE_SOURCE_DIR}/test/fixture/gcc-preserve-library-functions/expected.json
@@ -38,7 +38,7 @@ add_test(
     NAME cli_gcc_stdin_preserve_library_functions
     COMMAND ${CMAKE_SOURCE_DIR}/test/util/blot-and-compare.sh
         --stdin -pl
-        $<TARGET_FILE:blot_exe>
+        $<TARGET_FILE:blot_cli_exe>
         ${CMAKE_SOURCE_DIR}/test/fixture/gcc-preserve-library-functions/compile_commands.json
         ${CMAKE_SOURCE_DIR}/test/fixture/gcc-preserve-library-functions/source.cpp
         ${CMAKE_SOURCE_DIR}/test/fixture/gcc-preserve-library-functions/expected.json
@@ -49,7 +49,7 @@ add_test(
     NAME cli_clang_preserve_library_functions
     COMMAND ${CMAKE_SOURCE_DIR}/test/util/blot-and-compare.sh
         -pl
-        $<TARGET_FILE:blot_exe>
+        $<TARGET_FILE:blot_cli_exe>
         ${CMAKE_SOURCE_DIR}/test/fixture/clang-preserve-library-functions/compile_commands.json
         ${CMAKE_SOURCE_DIR}/test/fixture/clang-preserve-library-functions/source.cpp
         ${CMAKE_SOURCE_DIR}/test/fixture/clang-preserve-library-functions/expected.json
@@ -60,7 +60,7 @@ add_test(
     NAME cli_stdin_clang_preserve_library_functions
     COMMAND ${CMAKE_SOURCE_DIR}/test/util/blot-and-compare.sh
         --stdin -pl
-        $<TARGET_FILE:blot_exe>
+        $<TARGET_FILE:blot_cli_exe>
         ${CMAKE_SOURCE_DIR}/test/fixture/clang-preserve-library-functions/compile_commands.json
         ${CMAKE_SOURCE_DIR}/test/fixture/clang-preserve-library-functions/source.cpp
         ${CMAKE_SOURCE_DIR}/test/fixture/clang-preserve-library-functions/expected.json
@@ -71,7 +71,7 @@ add_test(
     NAME cli_clang_demangle
     COMMAND ${CMAKE_SOURCE_DIR}/test/util/blot-and-compare.sh
         --demangle
-        $<TARGET_FILE:blot_exe>
+        $<TARGET_FILE:blot_cli_exe>
         ${CMAKE_SOURCE_DIR}/test/fixture/clang-demangle/compile_commands.json
         ${CMAKE_SOURCE_DIR}/test/fixture/clang-demangle/source.cpp
         ${CMAKE_SOURCE_DIR}/test/fixture/clang-demangle/expected.json
@@ -82,7 +82,7 @@ add_test(
     NAME cli_stdin_clang_demangle
     COMMAND ${CMAKE_SOURCE_DIR}/test/util/blot-and-compare.sh
         --stdin --demangle
-        $<TARGET_FILE:blot_exe>
+        $<TARGET_FILE:blot_cli_exe>
         ${CMAKE_SOURCE_DIR}/test/fixture/clang-demangle/compile_commands.json
         ${CMAKE_SOURCE_DIR}/test/fixture/clang-demangle/source.cpp
         ${CMAKE_SOURCE_DIR}/test/fixture/clang-demangle/expected.json
@@ -92,7 +92,7 @@ add_test(
 add_test(
     NAME cli_gcc_errors
     COMMAND ${CMAKE_SOURCE_DIR}/test/util/blot-and-compare.sh
-        $<TARGET_FILE:blot_exe>
+        $<TARGET_FILE:blot_cli_exe>
         ${CMAKE_SOURCE_DIR}/test/fixture/gcc-errors/compile_commands.json
         ${CMAKE_SOURCE_DIR}/test/fixture/gcc-errors/source.cpp
         ${CMAKE_SOURCE_DIR}/test/fixture/gcc-errors/expected.json

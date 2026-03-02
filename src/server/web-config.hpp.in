@@ -1,4 +1,4 @@
 #pragma once
 #include <string_view>
 // Configured by CMake — points at the web/ directory in the source tree.
-inline constexpr std::string_view kWebRoot = "@WEB_ROOT@";
+inline constexpr std::string_view k_web_root = "@WEB_ROOT@";

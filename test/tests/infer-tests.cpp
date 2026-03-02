@@ -3,7 +3,6 @@
 #include <filesystem>
 
 #include "blot/ccj.hpp"
-#include "test_config.h"
 
 namespace fs = std::filesystem;
 

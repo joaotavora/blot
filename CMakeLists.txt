@@ -35,8 +35,8 @@ find_library(CLANG_CPP clang-cpp REQUIRED)
 find_library(LLVM LLVM REQUIRED)
 
 # Core blot library
-file(GLOB lib_sources CONFIGURE_DEPENDS src/libblot/*.cpp)
-add_library(blot_lib ${lib_sources})
+file(GLOB blot_lib_sources CONFIGURE_DEPENDS src/libblot/*.cpp)
+add_library(blot_lib ${blot_lib_sources})
 target_include_directories(blot_lib PUBLIC include)
 target_link_libraries(blot_lib PUBLIC
   re2::re2
@@ -49,73 +49,55 @@ target_link_libraries(blot_lib PUBLIC
 )
 target_compile_definitions(blot_lib PUBLIC LOG_NO_TIMESTAMP)
 
-# Configure web root path into a header so the server can find web/ at runtime
-set(WEB_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/web)
-configure_file(
-    src/blot/web_config.hpp.in
-    ${CMAKE_CURRENT_BINARY_DIR}/web_config.hpp
-    @ONLY
-)
-
-# Web/session server library (shared between blot_exe and test_blot_server)
-add_library(blot_server_lib src/blot/web.cpp src/blot/session.cpp)
+# Server library (http,websockets and stdio)
+file(GLOB blot_server_lib_sources CONFIGURE_DEPENDS src/server/*.cpp)
+add_library(blot_server_lib ${blot_server_lib_sources})
 target_include_directories(blot_server_lib PUBLIC
-  include src/blot src/libblot ${CMAKE_CURRENT_BINARY_DIR})
+  include src/server src/libblot ${CMAKE_CURRENT_BINARY_DIR})
 target_link_libraries(blot_server_lib PUBLIC
   blot_lib
   Boost::headers
 )
-
-# Main executable (all src/blot/*.cpp except web.cpp and session.cpp, which are in blot_server_lib)
-file(GLOB blot_sources CONFIGURE_DEPENDS src/blot/*.cpp)
-list(REMOVE_ITEM blot_sources
-  "${CMAKE_CURRENT_SOURCE_DIR}/src/blot/web.cpp"
-  "${CMAKE_CURRENT_SOURCE_DIR}/src/blot/session.cpp"
+set(WEB_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/web)
+configure_file(
+    src/server/web-config.hpp.in
+    ${CMAKE_CURRENT_BINARY_DIR}/web-config.hpp
+    @ONLY
 )
-add_executable(blot_exe ${blot_sources})
-target_include_directories(blot_exe PRIVATE include src/blot src/libblot ${CMAKE_CURRENT_BINARY_DIR})
-target_link_libraries(blot_exe PRIVATE
+
+# CLI executable
+file(GLOB blot_cli_sources CONFIGURE_DEPENDS src/cli/*.cpp)
+add_executable(blot_cli_exe ${blot_cli_sources})
+target_include_directories(blot_cli_exe PRIVATE src/blot)
+target_link_libraries(blot_cli_exe PRIVATE
+  blot_lib
   blot_server_lib
   CLI11::CLI11
   Boost::headers
 )
-set_target_properties(blot_exe PROPERTIES OUTPUT_NAME blot)
+set_target_properties(blot_cli_exe PROPERTIES OUTPUT_NAME blot)
 
-# Generate test configuration header
-configure_file(test/api/test_config.h.in test/api/test_config.h)
-
-# Doctest runner
-add_executable(test_blot test/api/main.cpp test/api/annotation-tests.cpp test/api/infer-tests.cpp)
+# Doctest tests
+file(GLOB_RECURSE test_blot_files test/tests/*.cpp)
+add_executable(test_blot ${test_blot_files})
 target_include_directories(test_blot PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/test/api)
 target_link_libraries(test_blot PRIVATE
   blot_lib
-  doctest::doctest
-)
-
-enable_testing()
-
-# Use doctest's test discovery to register individual test cases
-include(doctest)
-doctest_discover_tests(test_blot)
-
-# Server tests (in-process, no subprocess)
-add_executable(test_blot_server test/server/server_tests.cpp)
-target_link_libraries(test_blot_server PRIVATE
   blot_server_lib
   doctest::doctest
 )
-target_compile_definitions(test_blot_server PRIVATE
+enable_testing()
+include(doctest)
+doctest_discover_tests(test_blot)
+target_compile_definitions(test_blot PRIVATE
   TEST_FIXTURE_DIR="${CMAKE_SOURCE_DIR}/test/fixture"
 )
-doctest_discover_tests(test_blot_server)
 
-# Add system tests for blot executable
-include(test/cli/system-tests.cmake)
+# Non C++ tests system tests
+include(test/tests/cli-tests.cmake)
 
-# Add server tests (HTTP + JSONRPC session)
-include(test/server/server-tests.cmake)
-
-# Spoof executable for filesystem interception using overlayfs
+# Proof-of concept "spoof" executable for filesystem interception
+# using overlayfs.  To be integrated later
 add_executable(spoof_exe src/spoof/main.cpp)
 target_link_libraries(spoof_exe PRIVATE
   Boost::process
