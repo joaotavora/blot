@@ -115,11 +115,15 @@ static std::tuple<int64_t, int64_t, int64_t> run_pipeline(mock_session& sess) {
     CHECK(_caught);                                          \
   } while (false)
 
-TEST_CASE("server_initialize") {
-  auto ccj = fixture_ccj("gcc-minimal");
-  auto root = ccj.parent_path();
+struct gcc_minimal_fixture {
+  fs::path root{fixture_dir("gcc-minimal")};
+  fs::path ccj{root / "compile_commands.json"};
   mock_session sess{ccj, root};
 
+  gcc_minimal_fixture() { fs::current_path(root); }
+};
+
+TEST_CASE_FIXTURE(gcc_minimal_fixture, "server_initialize") {
   auto result = sess.call("initialize");
   CHECK(result.contains("serverInfo"));
   CHECK(result.at("serverInfo").as_object().at("name").as_string() == "blot");
@@ -129,31 +133,19 @@ TEST_CASE("server_initialize") {
   CHECK(ccj_str.find("gcc-minimal") != std::string::npos);
 }
 
-TEST_CASE("server_shutdown") {
-  auto ccj = fixture_ccj("gcc-minimal");
-  auto root = ccj.parent_path();
-  mock_session sess{ccj, root};
-
+TEST_CASE_FIXTURE(gcc_minimal_fixture, "server_shutdown") {
   sess.call("initialize");
   auto result = sess.call("shutdown");
   CHECK(result.empty());
 }
 
-TEST_CASE("server_unknown_method") {
-  auto ccj = fixture_ccj("gcc-minimal");
-  auto root = ccj.parent_path();
-  mock_session sess{ccj, root};
-
+TEST_CASE_FIXTURE(gcc_minimal_fixture, "server_unknown_method") {
   CHECK_RPC_ERROR(sess, "no_such_method", json::object{}, -32601);
 }
 
-TEST_CASE("server_full_pipeline") {
+TEST_CASE_FIXTURE(gcc_minimal_fixture, "server_full_pipeline") {
   // CWD must be the fixture dir so "directory":"." in compile_commands.json
   // resolves correctly (same approach as annotation-tests.cpp).
-  auto ccj = fixture_ccj("gcc-minimal");
-  auto root = ccj.parent_path();
-  fs::current_path(root);
-  mock_session sess{ccj, root};
   sess.call("initialize");
 
   // Phase 1: infer
@@ -189,11 +181,7 @@ TEST_CASE("server_full_pipeline") {
   CHECK(ann_res.at("cached").as_bool() == false);
 }
 
-TEST_CASE("server_progress_notifications") {
-  auto ccj = fixture_ccj("gcc-minimal");
-  auto root = ccj.parent_path();
-  fs::current_path(root);
-  mock_session sess{ccj, root};
+TEST_CASE_FIXTURE(gcc_minimal_fixture, "server_progress_notifications") {
   sess.call("initialize");
 
   json::object infer_params{};
@@ -213,10 +201,7 @@ TEST_CASE("server_progress_notifications") {
   CHECK(p1.contains("elapsed_ms"));
 }
 
-TEST_CASE("server_infer_unknown_file") {
-  auto ccj = fixture_ccj("gcc-minimal");
-  auto root = ccj.parent_path();
-  mock_session sess{ccj, root};
+TEST_CASE_FIXTURE(gcc_minimal_fixture, "server_infer_unknown_file") {
   sess.call("initialize");
 
   json::object params{};
@@ -231,12 +216,7 @@ TEST_CASE("server_infer_unknown_file") {
   CHECK(caught);
 }
 
-TEST_CASE("server_annotate_options") {
-  auto ccj = fixture_ccj("gcc-minimal");
-  auto root = ccj.parent_path();
-  fs::current_path(root);
-  mock_session sess{ccj, root};
-
+TEST_CASE_FIXTURE(gcc_minimal_fixture, "server_annotate_options") {
   sess.call("initialize");
 
   json::object ip{};
@@ -259,83 +239,48 @@ TEST_CASE("server_annotate_options") {
   CHECK(ann_res.at("assembly").as_array().size() > 0);
 }
 
-TEST_CASE("server_errors_unknown_method") {
-  auto ccj = fixture_ccj("gcc-minimal");
-  auto root = ccj.parent_path();
-  mock_session sess{ccj, root};
-
+TEST_CASE_FIXTURE(gcc_minimal_fixture, "server_errors_unknown_method") {
   CHECK_RPC_ERROR(sess, "blot/no_such_method", json::object{}, -32601);
 }
 
-TEST_CASE("server_errors_infer_missing_params") {
-  auto ccj = fixture_ccj("gcc-minimal");
-  auto root = ccj.parent_path();
-  mock_session sess{ccj, root};
-
+TEST_CASE_FIXTURE(gcc_minimal_fixture, "server_errors_infer_missing_params") {
   CHECK_RPC_ERROR(sess, "blot/infer", json::object{}, -32602);
 }
 
-TEST_CASE("server_errors_infer_path_traversal") {
-  auto ccj = fixture_ccj("gcc-minimal");
-  auto root = ccj.parent_path();
-  mock_session sess{ccj, root};
-
+TEST_CASE_FIXTURE(gcc_minimal_fixture, "server_errors_infer_path_traversal") {
   json::object params{};
   params["file"] = "../../etc/passwd";
   CHECK_RPC_ERROR(sess, "blot/infer", params, -32602);
 }
 
-TEST_CASE("server_errors_infer_stale_token") {
-  auto ccj = fixture_ccj("gcc-minimal");
-  auto root = ccj.parent_path();
-  mock_session sess{ccj, root};
-
+TEST_CASE_FIXTURE(gcc_minimal_fixture, "server_errors_infer_stale_token") {
   json::object params{};
   params["token"] = int64_t{999999};
   CHECK_RPC_ERROR(sess, "blot/infer", params, -32602);
 }
 
-TEST_CASE("server_errors_grabasm_missing_params") {
-  auto ccj = fixture_ccj("gcc-minimal");
-  auto root = ccj.parent_path();
-  mock_session sess{ccj, root};
-
+TEST_CASE_FIXTURE(gcc_minimal_fixture, "server_errors_grabasm_missing_params") {
   CHECK_RPC_ERROR(sess, "blot/grab_asm", json::object{}, -32602);
 }
 
-TEST_CASE("server_errors_grabasm_stale_token") {
-  auto ccj = fixture_ccj("gcc-minimal");
-  auto root = ccj.parent_path();
-  mock_session sess{ccj, root};
-
+TEST_CASE_FIXTURE(gcc_minimal_fixture, "server_errors_grabasm_stale_token") {
   json::object params{};
   params["token"] = int64_t{999999};
   CHECK_RPC_ERROR(sess, "blot/grab_asm", params, -32602);
 }
 
-TEST_CASE("server_errors_annotate_missing_params") {
-  auto ccj = fixture_ccj("gcc-minimal");
-  auto root = ccj.parent_path();
-  mock_session sess{ccj, root};
-
+TEST_CASE_FIXTURE(
+    gcc_minimal_fixture, "server_errors_annotate_missing_params") {
   CHECK_RPC_ERROR(sess, "blot/annotate", json::object{}, -32602);
 }
 
-TEST_CASE("server_errors_annotate_stale_token") {
-  auto ccj = fixture_ccj("gcc-minimal");
-  auto root = ccj.parent_path();
-  mock_session sess{ccj, root};
-
+TEST_CASE_FIXTURE(gcc_minimal_fixture, "server_errors_annotate_stale_token") {
   json::object params{};
   params["token"] = int64_t{999999};
   CHECK_RPC_ERROR(sess, "blot/annotate", params, -32602);
 }
 
-TEST_CASE("server_errors_do_not_break_session") {
-  auto ccj = fixture_ccj("gcc-minimal");
-  auto root = ccj.parent_path();
-  mock_session sess{ccj, root};
-
+TEST_CASE_FIXTURE(gcc_minimal_fixture, "server_errors_do_not_break_session") {
   for (int i = 0; i < 3; ++i) {
     try {
       sess.call("blot/infer", json::object{});
@@ -348,12 +293,7 @@ TEST_CASE("server_errors_do_not_break_session") {
   CHECK(result.contains("serverInfo"));
 }
 
-TEST_CASE("server_cache_grabasm_token") {
-  auto ccj = fixture_ccj("gcc-minimal");
-  auto root = ccj.parent_path();
-  fs::current_path(root);
-  mock_session sess{ccj, root};
-
+TEST_CASE_FIXTURE(gcc_minimal_fixture, "server_cache_grabasm_token") {
   auto [infer_tok, asm_tok, ann_tok] = run_pipeline(sess);
 
   json::object p{};
@@ -362,11 +302,7 @@ TEST_CASE("server_cache_grabasm_token") {
   CHECK(std::string{res.at("cached").as_string()} == "token");
 }
 
-TEST_CASE("server_cache_annotate_token") {
-  auto dir = fixture_dir("gcc-minimal");
-  fs::current_path(dir);
-  auto ccj = dir / "compile_commands.json";
-  mock_session sess{ccj, dir};
+TEST_CASE_FIXTURE(gcc_minimal_fixture, "server_cache_annotate_token") {
   auto [infer_tok, asm_tok, ann_tok] = run_pipeline(sess);
 
   json::object p{};
@@ -378,11 +314,7 @@ TEST_CASE("server_cache_annotate_token") {
   CHECK(std::string{res.at("cached").as_string()} == "token");
 }
 
-TEST_CASE("server_cache_infer_token") {
-  auto dir = fixture_dir("gcc-minimal");
-  fs::current_path(dir);
-  auto ccj = dir / "compile_commands.json";
-  mock_session sess{ccj, dir};
+TEST_CASE_FIXTURE(gcc_minimal_fixture, "server_cache_infer_token") {
   auto [infer_tok, asm_tok, ann_tok] = run_pipeline(sess);
 
   json::object p{};
@@ -392,30 +324,23 @@ TEST_CASE("server_cache_infer_token") {
   CHECK(res.at("token").as_int64() == infer_tok);
 }
 
-TEST_CASE("server_cache_is_session_scoped") {
-  auto dir = fixture_dir("gcc-minimal");
-  fs::current_path(dir);
-  auto ccj = dir / "compile_commands.json";
+TEST_CASE_FIXTURE(gcc_minimal_fixture, "server_cache_is_session_scoped") {
   int64_t infer_tok{};
   {
-    mock_session sess1{ccj, dir};
+    mock_session sess1{ccj, root};
     auto [it, at, ant] = run_pipeline(sess1);
     infer_tok = it;
   }
 
   // New session — tokens from the old session are unknown
-  mock_session sess2{ccj, dir};
+  mock_session sess2{ccj, root};
   sess2.call("initialize");
   json::object p{};
   p["token"] = infer_tok;
   CHECK_RPC_ERROR(sess2, "blot/infer", p, -32602);
 }
 
-TEST_CASE("server_cache_other_inference") {
-  auto dir = fixture_dir("gcc-minimal");
-  fs::current_path(dir);
-  auto ccj = dir / "compile_commands.json";
-  mock_session sess{ccj, dir};
+TEST_CASE_FIXTURE(gcc_minimal_fixture, "server_cache_other_inference") {
   sess.call("initialize");
 
   json::object ip{};
@@ -441,11 +366,7 @@ TEST_CASE("server_cache_other_inference") {
   CHECK(asm2.at("token").as_int64() == tok);
 }
 
-TEST_CASE("server_cache_other_pipelines") {
-  auto dir = fixture_dir("gcc-minimal");
-  fs::current_path(dir);
-  auto ccj = dir / "compile_commands.json";
-  mock_session sess{ccj, dir};
+TEST_CASE_FIXTURE(gcc_minimal_fixture, "server_cache_other_pipelines") {
   sess.call("initialize");
 
   // Pipeline A: populate asm_cache_2
