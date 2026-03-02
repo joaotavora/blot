@@ -1,38 +1,52 @@
 {
-  "version": 3,
+  "version": 6,
   "configurePresets": [
     {
-      "name": "dev",
-      "displayName": "Development Build",
+      "name": "base",
+      "hidden": true,
+      "binaryDir": "${sourceDir}/build-${presetName}",
+      "cacheVariables": {
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON"
+      }
+    },
+    {
+      "name": "debug",
+      "displayName": "GCC Debug + ASan/UBSan",
+      "inherits": "base",
       "binaryDir": "${sourceDir}/build-Debug",
       "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "Debug"
+        "CMAKE_BUILD_TYPE": "Debug",
+        "CMAKE_C_COMPILER": "gcc",
+        "CMAKE_CXX_COMPILER": "g++",
+        "CMAKE_CXX_FLAGS": "-fsanitize=address,undefined -fno-omit-frame-pointer"
       }
     },
     {
       "name": "release",
-      "displayName": "Release Build",
+      "displayName": "GCC Release",
+      "inherits": "base",
       "binaryDir": "${sourceDir}/build-Release",
       "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "Release"
+        "CMAKE_BUILD_TYPE": "Release",
+        "CMAKE_C_COMPILER": "gcc",
+        "CMAKE_CXX_COMPILER": "g++"
       }
     },
     {
       "name": "clang",
-      "displayName": "Clang Build (for -ftime-trace profiling)",
-      "binaryDir": "${sourceDir}/build-Clang",
-      "inherits": "dev",
+      "displayName": "Clang Debug + ASan/UBSan + -ftime-trace",
+      "inherits": "debug",
+      "binaryDir": "${sourceDir}/build-clang",
       "cacheVariables": {
         "CMAKE_C_COMPILER": "clang",
         "CMAKE_CXX_COMPILER": "clang++",
-        "CMAKE_CXX_FLAGS": "-ftime-trace"
-
+        "CMAKE_CXX_FLAGS": "-fsanitize=address,undefined -fno-omit-frame-pointer -ftime-trace"
       }
     },
     {
-      "name": "conan-dev",
-      "displayName": "Conan Development Build",
-      "inherits": "dev",
+      "name": "conan-debug",
+      "displayName": "Conan + GCC Debug",
+      "inherits": "debug",
       "cacheVariables": {
         "CMAKE_PROJECT_TOP_LEVEL_INCLUDES": "${sourceDir}/cmake/conan_provider.cmake",
         "CONAN_HOST_PROFILE": "${sourceDir}/cmake/conan-optimistic-gcc-profile",
@@ -42,13 +56,92 @@
     },
     {
       "name": "conan-release",
-      "displayName": "Conan Release Build",
+      "displayName": "Conan + GCC Release",
       "inherits": "release",
       "cacheVariables": {
         "CMAKE_PROJECT_TOP_LEVEL_INCLUDES": "${sourceDir}/cmake/conan_provider.cmake",
         "CONAN_HOST_PROFILE": "${sourceDir}/cmake/conan-optimistic-gcc-profile",
         "CONAN_INSTALL_ARGS": "--build=missing --settings build_type=Release"
       }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "debug",
+      "displayName": "Build Debug",
+      "configurePreset": "debug"
+    },
+    {
+      "name": "release",
+      "displayName": "Build Release",
+      "configurePreset": "release"
+    },
+    {
+      "name": "clang",
+      "displayName": "Build Clang",
+      "configurePreset": "clang"
+    }
+  ],
+  "testPresets": [
+    {
+      "name": "debug",
+      "displayName": "Test Debug",
+      "configurePreset": "debug",
+      "output": {
+        "outputOnFailure": true
+      },
+      "execution": {
+        "jobs": 4
+      }
+    },
+    {
+      "name": "release",
+      "displayName": "Test Release",
+      "configurePreset": "release",
+      "output": {
+        "outputOnFailure": true
+      },
+      "execution": {
+        "jobs": 4
+      }
+    }
+  ],
+  "workflowPresets": [
+    {
+      "name": "debug",
+      "displayName": "Configure + Build + Test (Debug)",
+      "steps": [
+        {
+          "type": "configure",
+          "name": "debug"
+        },
+        {
+          "type": "build",
+          "name": "debug"
+        },
+        {
+          "type": "test",
+          "name": "debug"
+        }
+      ]
+    },
+    {
+      "name": "release",
+      "displayName": "Configure + Build + Test (Release)",
+      "steps": [
+        {
+          "type": "configure",
+          "name": "release"
+        },
+        {
+          "type": "build",
+          "name": "release"
+        },
+        {
+          "type": "test",
+          "name": "release"
+        }
+      ]
     }
   ]
 }
