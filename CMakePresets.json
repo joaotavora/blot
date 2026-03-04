@@ -11,13 +11,13 @@
     },
     {
       "name": "debug",
-      "displayName": "GCC Debug + ASan/UBSan",
+      "displayName": "Clang Debug + ASan/UBSan",
       "inherits": "base",
       "binaryDir": "${sourceDir}/build-Debug",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Debug",
-        "CMAKE_C_COMPILER": "gcc",
-        "CMAKE_CXX_COMPILER": "g++",
+        "CMAKE_C_COMPILER": "clang",
+        "CMAKE_CXX_COMPILER": "clang++",
         "CMAKE_CXX_FLAGS": "-fsanitize=address,undefined -fno-omit-frame-pointer"
       }
     },
@@ -33,14 +33,15 @@
       }
     },
     {
-      "name": "clang",
-      "displayName": "Clang Debug + ASan/UBSan + -ftime-trace",
-      "inherits": "debug",
-      "binaryDir": "${sourceDir}/build-clang",
+      "name": "tsan",
+      "displayName": "Clang Debug + TSan/UBSan",
+      "inherits": "base",
+      "binaryDir": "${sourceDir}/build-TSan",
       "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
         "CMAKE_C_COMPILER": "clang",
         "CMAKE_CXX_COMPILER": "clang++",
-        "CMAKE_CXX_FLAGS": "-fsanitize=address,undefined -fno-omit-frame-pointer -ftime-trace"
+        "CMAKE_CXX_FLAGS": "-fsanitize=thread,undefined -fno-omit-frame-pointer"
       }
     },
     {
@@ -67,26 +68,33 @@
   ],
   "buildPresets": [
     {
+      "name": "base",
+      "hidden": true,
+      "jobs": 4
+    },
+    {
       "name": "debug",
       "displayName": "Build Debug",
+      "inherits": "base",
       "configurePreset": "debug"
     },
     {
       "name": "release",
       "displayName": "Build Release",
+      "inherits": "base",
       "configurePreset": "release"
     },
     {
-      "name": "clang",
-      "displayName": "Build Clang",
-      "configurePreset": "clang"
+      "name": "tsan",
+      "displayName": "Build TSan",
+      "inherits": "base",
+      "configurePreset": "tsan"
     }
   ],
   "testPresets": [
     {
-      "name": "debug",
-      "displayName": "Test Debug",
-      "configurePreset": "debug",
+      "name": "base",
+      "hidden": true,
       "output": {
         "outputOnFailure": true
       },
@@ -95,15 +103,22 @@
       }
     },
     {
+      "name": "debug",
+      "displayName": "Test Debug",
+      "inherits": "base",
+      "configurePreset": "debug"
+    },
+    {
+      "name": "tsan",
+      "displayName": "Test TSan",
+      "inherits": "base",
+      "configurePreset": "tsan"
+    },
+    {
       "name": "release",
       "displayName": "Test Release",
-      "configurePreset": "release",
-      "output": {
-        "outputOnFailure": true
-      },
-      "execution": {
-        "jobs": 4
-      }
+      "inherits": "base",
+      "configurePreset": "release"
     }
   ],
   "workflowPresets": [
@@ -122,6 +137,24 @@
         {
           "type": "test",
           "name": "debug"
+        }
+      ]
+    },
+    {
+      "name": "tsan",
+      "displayName": "Configure + Build + Test (TSan)",
+      "steps": [
+        {
+          "type": "configure",
+          "name": "tsan"
+        },
+        {
+          "type": "build",
+          "name": "tsan"
+        },
+        {
+          "type": "test",
+          "name": "tsan"
         }
       ]
     },

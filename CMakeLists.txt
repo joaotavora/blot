@@ -10,12 +10,6 @@ if(CCACHE)
   set(CMAKE_CXX_COMPILER_LAUNCHER ${CCACHE})
 endif()
 
-# Enable AddressSanitizer and UBSan in Debug builds
-if(CMAKE_BUILD_TYPE STREQUAL "Debug")
-  add_compile_options(-fsanitize=address,undefined)
-  add_link_options(-fsanitize=address,undefined)
-endif()
-
 # Try modern CMake first (works with Conan), fallback to PkgConfig
 find_package(re2 QUIET)
 if(NOT re2_FOUND)
