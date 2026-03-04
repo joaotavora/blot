@@ -10,10 +10,13 @@
 // NOLINTBEGIN(*-avoid-capturing-lambda-coroutines)
 namespace xpto::blot::tests {
 
-TEST_CASE("server_http_status_fields") {
-  test_server srv{fixture_ccj("gcc-minimal")};
-  run_http_test(srv.ioc, [&]() -> net::awaitable<void> {
-    auto client = connect_http(srv.port);
+struct http_fixture {
+  test_server http_server{fixture_ccj("gcc-minimal")};
+};
+
+TEST_CASE_FIXTURE(http_fixture, "server_http_status_fields") {
+  run_http_test(http_server.ioc, [&]() -> net::awaitable<void> {
+    auto client = connect_http(http_server.port);
     auto resp = co_await client->get("/api/status");
     REQUIRE(resp.status == 200);
     auto data = resp.json_body();
@@ -23,20 +26,18 @@ TEST_CASE("server_http_status_fields") {
   }());
 }
 
-TEST_CASE("server_http_status_tu_count") {
-  test_server srv{fixture_ccj("gcc-minimal")};
-  run_http_test(srv.ioc, [&]() -> net::awaitable<void> {
-    auto client = connect_http(srv.port);
+TEST_CASE_FIXTURE(http_fixture, "server_http_status_tu_count") {
+  run_http_test(http_server.ioc, [&]() -> net::awaitable<void> {
+    auto client = connect_http(http_server.port);
     auto resp = co_await client->get("/api/status");
     REQUIRE(resp.status == 200);
     CHECK(resp.json_body().at("tu_count").as_int64() == 1);
   }());
 }
 
-TEST_CASE("server_http_status_paths") {
-  test_server srv{fixture_ccj("gcc-minimal")};
-  run_http_test(srv.ioc, [&]() -> net::awaitable<void> {
-    auto client = connect_http(srv.port);
+TEST_CASE_FIXTURE(http_fixture, "server_http_status_paths") {
+  run_http_test(http_server.ioc, [&]() -> net::awaitable<void> {
+    auto client = connect_http(http_server.port);
     auto resp = co_await client->get("/api/status");
     REQUIRE(resp.status == 200);
     auto data = resp.json_body();
@@ -47,10 +48,9 @@ TEST_CASE("server_http_status_paths") {
   }());
 }
 
-TEST_CASE("server_http_files_lists_source") {
-  test_server srv{fixture_ccj("gcc-minimal")};
-  run_http_test(srv.ioc, [&]() -> net::awaitable<void> {
-    auto client = connect_http(srv.port);
+TEST_CASE_FIXTURE(http_fixture, "server_http_files_lists_source") {
+  run_http_test(http_server.ioc, [&]() -> net::awaitable<void> {
+    auto client = connect_http(http_server.port);
     auto resp = co_await client->get("/api/files");
     REQUIRE(resp.status == 200);
     auto data = resp.json_body();
@@ -66,10 +66,9 @@ TEST_CASE("server_http_files_lists_source") {
   }());
 }
 
-TEST_CASE("server_http_files_source_content") {
-  test_server srv{fixture_ccj("gcc-minimal")};
-  run_http_test(srv.ioc, [&]() -> net::awaitable<void> {
-    auto client = connect_http(srv.port);
+TEST_CASE_FIXTURE(http_fixture, "server_http_files_source_content") {
+  run_http_test(http_server.ioc, [&]() -> net::awaitable<void> {
+    auto client = connect_http(http_server.port);
     auto resp = co_await client->get("/api/source?file=source.cpp");
     REQUIRE(resp.status == 200);
     auto data = resp.json_body();
@@ -79,28 +78,25 @@ TEST_CASE("server_http_files_source_content") {
   }());
 }
 
-TEST_CASE("server_http_files_source_missing_param") {
-  test_server srv{fixture_ccj("gcc-minimal")};
-  run_http_test(srv.ioc, [&]() -> net::awaitable<void> {
-    auto client = connect_http(srv.port);
+TEST_CASE_FIXTURE(http_fixture, "server_http_files_source_missing_param") {
+  run_http_test(http_server.ioc, [&]() -> net::awaitable<void> {
+    auto client = connect_http(http_server.port);
     auto resp = co_await client->get("/api/source");
     CHECK(resp.status == 400);
   }());
 }
 
-TEST_CASE("server_http_files_source_path_traversal") {
-  test_server srv{fixture_ccj("gcc-minimal")};
-  run_http_test(srv.ioc, [&]() -> net::awaitable<void> {
-    auto client = connect_http(srv.port);
+TEST_CASE_FIXTURE(http_fixture, "server_http_files_source_path_traversal") {
+  run_http_test(http_server.ioc, [&]() -> net::awaitable<void> {
+    auto client = connect_http(http_server.port);
     auto resp = co_await client->get("/api/source?file=../../etc/passwd");
     CHECK(resp.status == 403);
   }());
 }
 
-TEST_CASE("server_http_files_source_not_found") {
-  test_server srv{fixture_ccj("gcc-minimal")};
-  run_http_test(srv.ioc, [&]() -> net::awaitable<void> {
-    auto client = connect_http(srv.port);
+TEST_CASE_FIXTURE(http_fixture, "server_http_files_source_not_found") {
+  run_http_test(http_server.ioc, [&]() -> net::awaitable<void> {
+    auto client = connect_http(http_server.port);
     auto resp = co_await client->get("/api/source?file=does_not_exist.cpp");
     CHECK(resp.status == 404);
   }());
