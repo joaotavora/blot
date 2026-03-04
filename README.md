@@ -10,7 +10,7 @@ this to be a building block in:
   a subprocess) to get live disassembly of your sources as you edit
   your code in your project.
 
-  Not unlike the Emacs [Beardbolt][beardbolt] plugin but much faster
+  In the spirit of the Emacs [Beardbolt][beardbolt] plugin, but faster
   and more powerful.
 
   In fact this [Vim plugin][vim-blot] is already using blot!
@@ -35,7 +35,7 @@ Blot can:
    Most importantly, this uses your project's actual build
    configuration to compile the source file and generate assembly.
 
-2. Annotate some pre-compiled code with `gcc` or `clang`
+2. Annotate some pre-compiled code with `gcc` or `clang`:
 
    Easiest is to pipe into stdin:
 
@@ -58,8 +58,8 @@ Blot can:
    blot --asm-file=file.s
    ```
 
-Add `--json` for structured output with line mappings (beware format may change!)
-Add `--demangle` for demangled output (this should probably be on by default)
+   Add `--json` for structured output with line mappings (beware: format may change).
+   Add `--demangle` for demangled output (probably should be the default).
 
 3. Launch a local web UI (horribly alpha, use at your own risk):
 
@@ -78,7 +78,7 @@ toolchain.
 
 ```bash
 # Configure and build development version
-cmake -B build-Debug -DCMAKE_BUILD_TYPE=Debug # aka cmake --preset=dev
+cmake -B build-Debug -DCMAKE_BUILD_TYPE=Debug # aka cmake --preset=debug
 cmake --build build-Debug
 
 # Or configure and build release version
@@ -99,9 +99,70 @@ The `blot` program will live in `build-Debug/blot` or
 `build-Release/blot`.
 
 There are dependencies (nothing exotic: `RE2` for regexps, `Boost` for
-JSON, Process.V2, and "Beast", `fmtlib` for formatting, `CLI11` for
-CLI handling, LLVM/Clang C++ libraries for C++/C parsing, `doctest`
-for tests)
+JSON, Process.V2, and Beast, `fmtlib` for formatting, `CLI11` for
+CLI handling, LLVM/Clang libraries for C++/C parsing, `doctest`
+for tests).
+
+## Organization
+
+* `include/blot/`
+
+  Public C++ API for TU-inferring capability (`ccj.hpp`), assembly
+  generation and annotation capability (`assembly.hpp` and
+  `blot.hpp`) into a C++ program.
+
+* `src/libblot/`
+
+  Core library implementation supporting the capabilities of
+  `include/blot/`.
+
+* `src/cli/`
+
+  The `blot` executable entry point: CLI argument parsing (`options.cpp`)
+  and `main.cpp`, which wires the chosen mode (direct annotation,
+  `--web`, or `--stdio`) to the library and server layers.
+
+* `src/server/`
+
+  Everything for `blot --web` and `blot --stdio`: the JSONRPC session
+  handler (`session.cpp`), HTTP route dispatch (`web-dispatch.cpp`),
+  Beast transport and WebSocket connection management (`web-beast.cpp`),
+  and the stdio LSP-style framing loop (`stdio.cpp`).
+
+* `src/spoof/`
+
+  A proof-of-concept that tricks a compiler invocation into reading
+  in-memory source buffers as if they were on disk, using Linux
+  overlayfs.  The groundwork for unsaved-buffer support.  Has its own
+  README.
+
+* `web/`
+
+  A single `index.html` containing the entire Vue 3 frontend, served
+  directly from disk by `--web` mode at runtime.
+
+* `test/fixture/`
+
+  Golden test fixtures, one subdirectory per compiler/scenario
+  combination.  Each contains a `compile_commands.json` and the
+  expected annotation output that tests compare against.
+
+* `test/tests/`
+
+  All C++ tests, run as a single doctest binary.  `session-tests.cpp`
+  exercises the JSONRPC session layer in-process via a `mock_session`;
+  `http-tests*.cpp` spin up a real server and hit it over TCP.
+
+* `test/util/`
+
+  Shell helpers: `blot-and-compare.sh` runs blot and diffs against a
+  fixture, `regenerate-fixtures.sh` refreshes all golden outputs.
+
+* `cmake/`
+
+  Conan 2 integration (`conan_provider.cmake`) and a GCC profile for
+  optimistic dependency resolution.
+
 
 ## Roadmap
 
@@ -116,7 +177,7 @@ for tests)
 
 * *100%* Auto-demangling support using `cxxabi.h`
 
-  Other ABI's not in the roadmap for now.
+  Other ABIs not in the roadmap for now.
 
 * *95%* Compilation error handling
 
@@ -132,7 +193,7 @@ for tests)
   each entry and walking its inclusion tree via Clang's `PPCallbacks`.
 
   There is decent test coverage for this, but edge cases remain.  One
-  of them has to do with code injected by sanitizers (UBSan and ASAN),
+  of them has to do with code injected by sanitizers (ASan and UBSan),
   which makes for very noisy annotation results.  The other has to
   do with inlining.  In higher optimization settings, the functions
   that inline the header's code are often not in the header file
@@ -150,12 +211,13 @@ for tests)
   The remaining work is wiring it into the full compilation and
   JSONRPC pipeline.
 
-* *30%* Web UI (`--web`)
+* *40%* Web UI (`--web`)
 
   A browser-based project explorer (`blot --web`) is implemented but
   very rough.  It serves a Vue 3 single-page app backed by a
-  JSONRPC/WebSocket server.  Many things are missing.  The
-  highlighting is horribly slow for one.
+  JSONRPC/WebSocket server.  Many things are missing.  Concurrency
+  (i.e. jumping around before a source file has finished annotating)
+  probably very broken.
 
 * *30%* Editor tooling
 
@@ -166,7 +228,7 @@ for tests)
   [Beardbolt][beardbolt]'s UI.
 
 * *20%* Decent-ish C/C++ stable API and ABI.  The so-called
-  "hourglass" pattern might come in handy
+  "hourglass" pattern might come in handy.
 
 * *90%* Package management
 
@@ -193,14 +255,14 @@ If you have Conan 2 installed, you can automatically download and
 build the dependencies (except the LLVM/Clang libraries which must be
 installed separately, for now).
 
-There are some profiles `conan-dev` and `conan-release` that make use
+There are some profiles `conan-debug` and `conan-release` that make use
 of [conan-cmake][1] integration, so no manual `conan install` is
-needed - CMake will automatically invoke Conan during configuration.
+needed — CMake will automatically invoke Conan during configuration.
 
 1. For a Conan-enabled **development** build of Blot
 
    ```bash
-   cmake --preset=conan-dev
+   cmake --preset=conan-debug
    cmake --build build-Debug
    ```
 
