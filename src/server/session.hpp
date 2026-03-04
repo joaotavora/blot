@@ -1,6 +1,7 @@
 #pragma once
 
 #include <boost/json.hpp>
+#include <concepts>
 #include <cstdint>
 #include <filesystem>
 #include <mutex>
@@ -23,7 +24,7 @@ using token_t = int64_t;
 
 struct error {
   int code;
-  std::string_view message;
+  std::string message;
   std::optional<json::object> data{};
 };
 using jsonrpc_response_t = std::variant<json::object, error>;
@@ -40,26 +41,7 @@ struct annotate_entry {
   json::object annotated;
 };
 
-class session;
-
-/// Callable passed to handlers for emitting progress notifications.
-/// Handlers call it as: send_progress("phase", "status") or
-/// send_progress("phase", "status", elapsed_ms).  No JSONRPC knowledge needed.
-struct progress_fn {
-  void operator()(
-      std::string_view phase, std::string_view status,
-      std::optional<long long> ms = std::nullopt) const;
-
- private:
-  friend class session;
-  progress_fn(session* s, const json::value& id) : sess_{s}, id_{&id} {}
-  session* sess_;
-  const json::value* id_;
-};
-
 class session {
-  friend struct progress_fn;
-
   const fs::path* ccj_path;
   const fs::path* project_root;
   mutable std::mutex cache_mutex;
@@ -74,13 +56,17 @@ class session {
       std::optional<long long> elapsed_ms = std::nullopt);
 
   jsonrpc_response_t handle_initialize(
-      const json::object& params, const progress_fn& send_progress);
+      const json::object& params,
+      std::invocable<std::string_view, std::string_view> auto&& send_progress);
   jsonrpc_response_t handle_infer(
-      const json::object& params, const progress_fn& send_progress);
+      const json::object& params,
+      std::invocable<std::string_view, std::string_view> auto&& send_progress);
   jsonrpc_response_t handle_grabasm(
-      const json::object& params, const progress_fn& send_progress);
+      const json::object& params,
+      std::invocable<std::string_view, std::string_view> auto&& send_progress);
   jsonrpc_response_t handle_annotate(
-      const json::object& params, const progress_fn& send_progress);
+      const json::object& params,
+      std::invocable<std::string_view, std::string_view> auto&& send_progress);
 
  public:
   session(const session&) = delete;

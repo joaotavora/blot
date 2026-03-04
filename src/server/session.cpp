@@ -50,14 +50,6 @@ static annotation_options parse_aopts(const json::object* opts) {
   return aopts;
 }
 
-/// progress_fn
-
-void progress_fn::operator()(
-    std::string_view phase, std::string_view status,
-    std::optional<long long> ms) const {
-  sess_->send_progress_(*id_, phase, status, ms);
-}
-
 /// session members
 
 session::session(const fs::path& ccj_path, const fs::path& project_root)
@@ -109,7 +101,9 @@ void session::send_progress_(
 /// Handlers
 
 jsonrpc_response_t session::handle_initialize(
-    const json::object& /*params*/, const progress_fn& /*send_progress*/) {
+    const json::object& /*params*/,
+    std::invocable<
+        std::string_view, std::string_view> auto&& /*send_progress*/) {
   json::object result{};
   json::object server_info{};
   server_info["name"] = "blot";
@@ -121,7 +115,8 @@ jsonrpc_response_t session::handle_initialize(
 }
 
 jsonrpc_response_t session::handle_infer(
-    const json::object& params, const progress_fn& send_progress) {
+    const json::object& params,
+    std::invocable<std::string_view, std::string_view> auto&& send_progress) {
   token_t tok{};
   if (params.contains("token")) {
     tok = params.at("token").as_int64();
@@ -199,7 +194,8 @@ jsonrpc_response_t session::handle_infer(
 }
 
 jsonrpc_response_t session::handle_grabasm(
-    const json::object& params, const progress_fn& send_progress) {
+    const json::object& params,
+    std::invocable<std::string_view, std::string_view> auto&& send_progress) {
   // Phase 1: locked cache check
   std::optional<json::object> cached;
   compile_command cmd;
@@ -304,7 +300,8 @@ jsonrpc_response_t session::handle_grabasm(
 }
 
 jsonrpc_response_t session::handle_annotate(
-    const json::object& params, const progress_fn& send_progress) {
+    const json::object& params,
+    std::invocable<std::string_view, std::string_view> auto&& send_progress) {
   const json::object* opts_ptr{nullptr};
   if (params.contains("options")) {
     opts_ptr = params.at("options").if_object();
@@ -410,7 +407,11 @@ bool session::handle_frame(std::string_view text) {
 
   LOG_INFO("ws rpc: {}", method);
 
-  progress_fn sp{this, id};
+  auto sp = [this, &id](
+                std::string_view phase, std::string_view status,
+                std::optional<long long> ms = std::nullopt) {
+    send_progress_(id, phase, status, ms);
+  };
 
   if (method == "initialize") {
     reply_(id, handle_initialize(params, sp));
