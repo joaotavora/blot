@@ -136,6 +136,7 @@ jsonrpc_response_t session::handle_infer(
       }
     }
     if (cached) {
+      send_progress("infer", "running");
       send_progress("infer", "cached", 0);
       return *cached;
     }
@@ -251,6 +252,7 @@ jsonrpc_response_t session::handle_grabasm(
   }
 
   if (cached) {
+    send_progress("grabasm", "running");
     send_progress("grabasm", "cached", 0);
     return *cached;
   }
@@ -334,6 +336,7 @@ jsonrpc_response_t session::handle_annotate(
       }
     }
     if (cached) {
+      send_progress("annotate", "running");
       send_progress("annotate", "cached", 0);
       return *cached;
     }
