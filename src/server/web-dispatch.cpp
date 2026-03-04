@@ -64,6 +64,33 @@ static std::optional<std::vector<std::string>> try_git_ls_files(
   return result;
 }
 
+static std::string decode_uri(std::string s) {
+  std::string out;
+  out.reserve(s.size());
+  for (size_t i = 0; i < s.size(); ++i) {
+    if (s[i] == '+') {
+      out += ' ';
+      continue;
+    }
+    if (s[i] == '%' && i + 2 < s.size()) {
+      auto h = [](char c) -> int {
+        if (c >= '0' && c <= '9') return c - '0';
+        if (c >= 'a' && c <= 'f') return c - 'a' + 10;
+        if (c >= 'A' && c <= 'F') return c - 'A' + 10;
+        return -1;
+      };
+      int hi = h(s[i + 1]), lo = h(s[i + 2]);
+      if (hi >= 0 && lo >= 0) {
+        out += static_cast<char>(hi * 16 + lo);
+        i += 2;
+        continue;
+      }
+    }
+    out += s[i];
+  }
+  return out;
+}
+
 std::vector<std::string> list_source_files(const fs::path& root) {
   if (fs::exists(root / ".git")) {
     if (auto files = try_git_ls_files(root)) {
@@ -152,32 +179,6 @@ response_t dispatch(
       return make_error(
           http::status::bad_request, "missing ?file=", version, keep_alive);
     std::string query = target.substr(qpos + 1);
-    auto decode_uri = [](std::string s) -> std::string {
-      std::string out;
-      out.reserve(s.size());
-      for (size_t i = 0; i < s.size(); ++i) {
-        if (s[i] == '+') {
-          out += ' ';
-          continue;
-        }
-        if (s[i] == '%' && i + 2 < s.size()) {
-          auto h = [](char c) -> int {
-            if (c >= '0' && c <= '9') return c - '0';
-            if (c >= 'a' && c <= 'f') return c - 'a' + 10;
-            if (c >= 'A' && c <= 'F') return c - 'A' + 10;
-            return -1;
-          };
-          int hi = h(s[i + 1]), lo = h(s[i + 2]);
-          if (hi >= 0 && lo >= 0) {
-            out += static_cast<char>(hi * 16 + lo);
-            i += 2;
-            continue;
-          }
-        }
-        out += s[i];
-      }
-      return out;
-    };
     std::string file_param;
     std::istringstream qs{query};
     std::string kv;
