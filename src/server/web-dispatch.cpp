@@ -193,7 +193,7 @@ response_t dispatch(
 
     std::error_code ec;
     fs::path requested = fs::weakly_canonical(project_root / file_param, ec);
-    if (ec || requested.string().find(project_root.string()) != 0)
+    if (ec || !requested.string().starts_with(project_root.string()))
       return make_error(
           http::status::forbidden, "path traversal denied", version,
           keep_alive);

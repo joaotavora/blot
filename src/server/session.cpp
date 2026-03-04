@@ -84,7 +84,7 @@ void session::reply_(const json::value& id, const jsonrpc_response_t& res) {
           m["error"] = std::move(err);
           return m;
         } else {
-          static_assert(false, "Nope");
+          static_assert(!sizeof(t), "unhandled jsonrpc_response_t alternative");
         }
       },
       res);
@@ -156,7 +156,7 @@ jsonrpc_response_t session::handle_infer(
 
   std::error_code ec{};
   auto abs_file = fs::weakly_canonical(*project_root / file_str, ec);
-  if (ec || abs_file.string().find(project_root->string()) != 0)
+  if (ec || !abs_file.string().starts_with(project_root->string()))
     return error{-32602, "path traversal denied"};
 
   send_progress("infer", "running");
@@ -238,7 +238,7 @@ jsonrpc_response_t session::handle_grabasm(
     }
 
     if (!cached) {
-      cache_key = cmd.command + "|" + cmd.directory.string();
+      cache_key = cmd.command + '\0' + cmd.directory.string();
       if (auto it = asm_cache_2.find(cache_key); it != asm_cache_2.end()) {
         int cached_tok{it->second.first};
         const auto& cr = it->second.second.result;

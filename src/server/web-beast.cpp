@@ -42,12 +42,12 @@ struct ws_session : session {
 
   ws_session(
       stream_t ws, const fs::path& ccj_path, const fs::path& project_root)
-      : ws{std::move(ws)}, session{ccj_path, project_root} {
+      : session{ccj_path, project_root}, ws{std::move(ws)} {
     this->ws.text(true);
   }
 
   void send(const json::object& msg) override {
-    auto text = json::serialize(msg);
+    auto text = json::serialize(msg);  // serialize before lock
     std::lock_guard lk{write_mutex};
     beast::error_code ec{};
     ws.write(net::buffer(text), ec);
