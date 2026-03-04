@@ -1,5 +1,7 @@
 #pragma once
 
+#include <boost/asio/any_io_executor.hpp>
+#include <thread>
 #define BOOST_ASIO_NO_DEPRECATED
 #include <boost/asio/awaitable.hpp>
 #include <boost/asio/co_spawn.hpp>
@@ -31,38 +33,18 @@ struct http_response {
 
 /// Owns an io_context and starts the web server on it.
 struct test_server {
-  net::io_context ioc;
   int port;
+  fs::path ccj;
 
-  explicit test_server(const fs::path& ccj)
-      : port{xpto::blot::run_web_server(ioc.get_executor(), ccj, 0)} {}
+   explicit test_server(const net::any_io_executor& ex, fs::path ccj)
+  : port{xpto::blot::run_web_server(ex, ccj, 0)},
+        ccj{std::move(ccj)} {}
 };
 
-/// Run an HTTP test coroutine on ioc alongside the server.
+/// Run a test coroutine on ioc. Calls restart() first to allow ioc reuse.
 template <typename Coro>
-static void run_http_test(net::io_context& ioc, Coro coro) {
-  std::exception_ptr ep;
-  net::co_spawn(ioc, std::move(coro), [&ep, &ioc](std::exception_ptr e) {
-    ep = e;  // NOLINT(*-value-param)
-    ioc.stop();
-  });
-  ioc.run();
-  if (ep) std::rethrow_exception(ep);
-}
-
-/// Owns a thread pool and starts the web server on it (for concurrency tests).
-struct ws_test_server {
-  net::thread_pool pool{4};
-  int port;
-
-  explicit ws_test_server(const fs::path& ccj)
-      : port{xpto::blot::run_web_server(pool.get_executor(), ccj, 0)} {}
-};
-
-/// Run a WS test coroutine on its own io_context.
-template <typename Coro>
-static void run_ws_test(ws_test_server& /*srv*/, Coro coro) {
-  net::io_context ioc;
+static void run_ioc_test(net::io_context& ioc, Coro coro, size_t nthreads = 1) {
+  ioc.restart();
   std::exception_ptr ep;
   net::co_spawn(ioc, std::move(coro), [&ep, &ioc](std::exception_ptr e) {
     ep = e;  // NOLINT(*-value-param)

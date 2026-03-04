@@ -3,6 +3,8 @@
 
 #include <doctest/doctest.h>
 
+#include <boost/asio/io_context.hpp>
+#include <boost/asio/thread_pool.hpp>
 #include <cstdint>
 #include <string>
 #include <string_view>
@@ -11,11 +13,15 @@
 namespace xpto::blot::tests {
 
 struct http_fixture {
-  test_server http_server{fixture_ccj("gcc-minimal")};
+  net::io_context ioc;
+  net::thread_pool pool{4};
+  test_server http_server{pool.get_executor(), fixture_ccj("gcc-minimal")};
+
+  http_fixture() { fs::current_path(fixture_dir("gcc-minimal")); }
 };
 
 TEST_CASE_FIXTURE(http_fixture, "server_http_status_fields") {
-  run_http_test(http_server.ioc, [&]() -> net::awaitable<void> {
+  run_ioc_test(ioc, [&]() -> net::awaitable<void> {
     auto client = connect_http(http_server.port);
     auto resp = co_await client->get("/api/status");
     REQUIRE(resp.status == 200);
@@ -27,7 +33,7 @@ TEST_CASE_FIXTURE(http_fixture, "server_http_status_fields") {
 }
 
 TEST_CASE_FIXTURE(http_fixture, "server_http_status_tu_count") {
-  run_http_test(http_server.ioc, [&]() -> net::awaitable<void> {
+  run_ioc_test(ioc, [&]() -> net::awaitable<void> {
     auto client = connect_http(http_server.port);
     auto resp = co_await client->get("/api/status");
     REQUIRE(resp.status == 200);
@@ -36,7 +42,7 @@ TEST_CASE_FIXTURE(http_fixture, "server_http_status_tu_count") {
 }
 
 TEST_CASE_FIXTURE(http_fixture, "server_http_status_paths") {
-  run_http_test(http_server.ioc, [&]() -> net::awaitable<void> {
+  run_ioc_test(ioc, [&]() -> net::awaitable<void> {
     auto client = connect_http(http_server.port);
     auto resp = co_await client->get("/api/status");
     REQUIRE(resp.status == 200);
@@ -49,7 +55,7 @@ TEST_CASE_FIXTURE(http_fixture, "server_http_status_paths") {
 }
 
 TEST_CASE_FIXTURE(http_fixture, "server_http_files_lists_source") {
-  run_http_test(http_server.ioc, [&]() -> net::awaitable<void> {
+  run_ioc_test(ioc, [&]() -> net::awaitable<void> {
     auto client = connect_http(http_server.port);
     auto resp = co_await client->get("/api/files");
     REQUIRE(resp.status == 200);
@@ -67,7 +73,7 @@ TEST_CASE_FIXTURE(http_fixture, "server_http_files_lists_source") {
 }
 
 TEST_CASE_FIXTURE(http_fixture, "server_http_files_source_content") {
-  run_http_test(http_server.ioc, [&]() -> net::awaitable<void> {
+  run_ioc_test(ioc, [&]() -> net::awaitable<void> {
     auto client = connect_http(http_server.port);
     auto resp = co_await client->get("/api/source?file=source.cpp");
     REQUIRE(resp.status == 200);
@@ -79,7 +85,7 @@ TEST_CASE_FIXTURE(http_fixture, "server_http_files_source_content") {
 }
 
 TEST_CASE_FIXTURE(http_fixture, "server_http_files_source_missing_param") {
-  run_http_test(http_server.ioc, [&]() -> net::awaitable<void> {
+  run_ioc_test(ioc, [&]() -> net::awaitable<void> {
     auto client = connect_http(http_server.port);
     auto resp = co_await client->get("/api/source");
     CHECK(resp.status == 400);
@@ -87,7 +93,7 @@ TEST_CASE_FIXTURE(http_fixture, "server_http_files_source_missing_param") {
 }
 
 TEST_CASE_FIXTURE(http_fixture, "server_http_files_source_path_traversal") {
-  run_http_test(http_server.ioc, [&]() -> net::awaitable<void> {
+  run_ioc_test(ioc, [&]() -> net::awaitable<void> {
     auto client = connect_http(http_server.port);
     auto resp = co_await client->get("/api/source?file=../../etc/passwd");
     CHECK(resp.status == 403);
@@ -95,23 +101,16 @@ TEST_CASE_FIXTURE(http_fixture, "server_http_files_source_path_traversal") {
 }
 
 TEST_CASE_FIXTURE(http_fixture, "server_http_files_source_not_found") {
-  run_http_test(http_server.ioc, [&]() -> net::awaitable<void> {
+  run_ioc_test(ioc, [&]() -> net::awaitable<void> {
     auto client = connect_http(http_server.port);
     auto resp = co_await client->get("/api/source?file=does_not_exist.cpp");
     CHECK(resp.status == 404);
   }());
 }
 
-TEST_CASE("server_ws_concurrent_grab_asm") {
-  // The server runs on a real thread pool; the test client runs on its
-  // own io_context and communicates over TCP — the actual interface.
-  auto dir = fixture_dir("gcc-minimal");
-  fs::current_path(dir);
-  auto ccj = dir / "compile_commands.json";
-  ws_test_server srv{ccj};
-
-  run_ws_test(srv, [&]() -> net::awaitable<void> {
-    auto ws = co_await connect_ws(srv.port);
+TEST_CASE_FIXTURE(http_fixture, "server_ws_concurrent_grab_asm") {
+  run_ioc_test(ioc, [&]() -> net::awaitable<void> {
+    auto ws = co_await connect_ws(http_server.port);
 
     auto send_req = [&ws](
                         int id, std::string_view method,
