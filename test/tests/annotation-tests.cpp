@@ -8,15 +8,17 @@
 #include "blot/assembly.hpp"
 #include "blot/blot.hpp"
 #include "blot/ccj.hpp"
+#include "fixture.hpp"
 
 namespace fs = std::filesystem;
 namespace json = boost::json;
+using xpto::blot::tests::fixture_dir;
 
 // Reusable test function for any fixture (new API: just pass fixture name)
 void test_annotation_against_expectation(
     const std::string& fixture_name,
     const xpto::blot::annotation_options& aopts = {}) {
-  auto fixture_subdir = fs::path(TEST_FIXTURE_DIR) / fixture_name;
+  auto fixture_subdir = fixture_dir(fixture_name);
 
   // Change to fixture subdirectory
   fs::current_path(fixture_subdir);
@@ -105,7 +107,7 @@ TEST_CASE("api_clang_demangle") {
 
 TEST_CASE("api_gcc_errors") {
   // This test verifies that compilation errors are properly handled
-  auto fixture = fs::path(TEST_FIXTURE_DIR) / "gcc-errors";
+  auto fixture = fixture_dir("gcc-errors");
   fs::current_path(fixture);
 
   auto cmd = xpto::blot::infer("compile_commands.json", "source.cpp");
@@ -118,7 +120,7 @@ TEST_CASE("api_gcc_errors") {
 TEST_CASE("api_gcc_includes_source") {
   // Annotating the TU directly (no target_file): main should appear, thingy
   // should not (it lives in the included header).
-  auto fixture = fs::path(TEST_FIXTURE_DIR) / "gcc-includes";
+  auto fixture = fixture_dir("gcc-includes");
   fs::current_path(fixture);
 
   auto cmd = xpto::blot::infer("compile_commands.json", "source.cpp");
@@ -143,7 +145,7 @@ TEST_CASE("api_gcc_includes_source") {
 TEST_CASE("api_gcc_includes_header") {
   // Annotating a header file via target_file: thingy (defined in header.hpp)
   // should appear; main (defined in the including TU) should not.
-  auto fixture = fs::path(TEST_FIXTURE_DIR) / "gcc-includes";
+  auto fixture = fixture_dir("gcc-includes");
   fs::current_path(fixture);
 
   auto cmd = xpto::blot::infer("compile_commands.json", "header.hpp");
@@ -184,7 +186,7 @@ static bool is_label_with(const std::string& line, std::string_view needle) {
 // by a single source.cpp.  annotate() must use the full path to distinguish
 // them, not just the basename.
 TEST_CASE("api_gcc_deep_hierarchy_2_outer") {
-  fs::path fixture = fs::path{TEST_FIXTURE_DIR} / "gcc-deep-hierarchy-2";
+  fs::path fixture = fixture_dir("gcc-deep-hierarchy-2");
   fs::current_path(fixture);
 
   auto cmd = xpto::blot::infer("compile_commands.json", fixture / "header.hpp");
@@ -206,7 +208,7 @@ TEST_CASE("api_gcc_deep_hierarchy_2_outer") {
 }
 
 TEST_CASE("api_gcc_deep_hierarchy_2_inner") {
-  fs::path fixture = fs::path{TEST_FIXTURE_DIR} / "gcc-deep-hierarchy-2";
+  fs::path fixture = fixture_dir("gcc-deep-hierarchy-2");
   fs::current_path(fixture);
 
   auto cmd = xpto::blot::infer(
@@ -232,7 +234,7 @@ TEST_CASE("api_gcc_deep_hierarchy_2_inner") {
 // Clang emits an explicit directory on every .file entry (e.g. "." and
 // "./inner"), whereas GCC leaves the directory empty for non-primary files.
 TEST_CASE("api_clang_deep_hierarchy_2_outer") {
-  fs::path fixture = fs::path{TEST_FIXTURE_DIR} / "clang-deep-hierarchy-2";
+  fs::path fixture = fixture_dir("clang-deep-hierarchy-2");
   fs::current_path(fixture);
 
   auto cmd = xpto::blot::infer("compile_commands.json", fixture / "header.hpp");
@@ -253,7 +255,7 @@ TEST_CASE("api_clang_deep_hierarchy_2_outer") {
 }
 
 TEST_CASE("api_clang_deep_hierarchy_2_inner") {
-  fs::path fixture = fs::path{TEST_FIXTURE_DIR} / "clang-deep-hierarchy-2";
+  fs::path fixture = fixture_dir("clang-deep-hierarchy-2");
   fs::current_path(fixture);
 
   auto cmd = xpto::blot::infer(
@@ -277,7 +279,7 @@ TEST_CASE("api_clang_deep_hierarchy_2_inner") {
 TEST_CASE("api_gcc_header_woes") {
   // Annotating header1.hpp: functions that inline count_positives (from
   // header1) should appear, but their unrelated callees should not.
-  fs::path fixture = fs::path{TEST_FIXTURE_DIR} / "gcc-header-woes";
+  fs::path fixture = fixture_dir("gcc-header-woes");
   fs::current_path(fixture);
 
   auto cmd = xpto::blot::infer("compile_commands.json", "header1.hpp");

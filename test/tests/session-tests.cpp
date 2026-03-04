@@ -9,7 +9,7 @@
 #include <tuple>
 #include <vector>
 
-#include "http-tests.hpp"
+#include "fixture.hpp"
 #include "session.hpp"
 
 namespace json = boost::json;

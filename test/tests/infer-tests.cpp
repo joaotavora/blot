@@ -3,12 +3,14 @@
 #include <filesystem>
 
 #include "blot/ccj.hpp"
+#include "fixture.hpp"
 
 namespace fs = std::filesystem;
+using xpto::blot::tests::fixture_dir;
 
 TEST_CASE("infer-basic") {
   // Test that infer finds the expected includer
-  fs::path gcc_includes = fs::path{TEST_FIXTURE_DIR} / "gcc-includes";
+  fs::path gcc_includes = fixture_dir("gcc-includes");
 
   auto result = xpto::blot::infer(
       gcc_includes / "compile_commands.json", gcc_includes / "header.hpp");
@@ -19,7 +21,7 @@ TEST_CASE("infer-basic") {
 
 TEST_CASE("infer-go-into-dir") {
   // Test that infer finds the expected includer including from subdirectory
-  fs::path gcc_includes = fs::path{TEST_FIXTURE_DIR} / "gcc-includes";
+  fs::path gcc_includes = fixture_dir("gcc-includes");
 
   auto result = xpto::blot::infer(
       gcc_includes / "compile_commands.json",
@@ -39,7 +41,7 @@ TEST_CASE("infer-go-into-dir") {
 TEST_CASE("infer-deep-outer-by-abspath") {
   // Searching by the absolute path of the outer header.hpp performs an exact
   // match and correctly identifies source-1.cpp.
-  fs::path fixture = fs::path{TEST_FIXTURE_DIR} / "gcc-deep-hierarchy";
+  fs::path fixture = fixture_dir("gcc-deep-hierarchy");
 
   auto result = xpto::blot::infer(
       fixture / "compile_commands.json", fixture / "header.hpp");
@@ -51,7 +53,7 @@ TEST_CASE("infer-deep-outer-by-abspath") {
 TEST_CASE("infer-deep-inner-by-abspath") {
   // Searching by the absolute path of inner/header.hpp correctly identifies
   // source-2.cpp — the only translation unit that actually includes it.
-  fs::path fixture = fs::path{TEST_FIXTURE_DIR} / "gcc-deep-hierarchy";
+  fs::path fixture = fixture_dir("gcc-deep-hierarchy");
 
   auto result = xpto::blot::infer(
       fixture / "compile_commands.json", fixture / "inner" / "header.hpp");
@@ -64,7 +66,7 @@ TEST_CASE("infer-deep-outer-by-relative-filename") {
   // A bare relative filename is resolved against the directory of the
   // compile_commands.json file.  "header.hpp" therefore becomes
   // fixture/header.hpp, which is the outer header included by source-1.cpp.
-  fs::path fixture = fs::path{TEST_FIXTURE_DIR} / "gcc-deep-hierarchy";
+  fs::path fixture = fixture_dir("gcc-deep-hierarchy");
   fs::current_path(fixture);
 
   auto result = xpto::blot::infer("compile_commands.json", "header.hpp");
@@ -77,7 +79,7 @@ TEST_CASE("infer-deep-inner-by-relative-path") {
   // A relative path is resolved against the directory of the
   // compile_commands.json file.  "inner/header.hpp" therefore becomes
   // fixture/inner/header.hpp, which is included only by source-2.cpp.
-  fs::path fixture = fs::path{TEST_FIXTURE_DIR} / "gcc-deep-hierarchy";
+  fs::path fixture = fixture_dir("gcc-deep-hierarchy");
   fs::current_path(fixture);
 
   auto result = xpto::blot::infer("compile_commands.json", "inner/header.hpp");

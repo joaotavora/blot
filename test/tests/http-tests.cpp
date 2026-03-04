@@ -1,4 +1,5 @@
 #include "http-tests.hpp"
+#include "fixture.hpp"
 
 #include <doctest/doctest.h>
 

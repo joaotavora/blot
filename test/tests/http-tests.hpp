@@ -109,12 +109,4 @@ struct http_client {
 /// Defined in http-tests-beast.cpp.
 std::unique_ptr<http_client> connect_http(int port);
 
-inline fs::path fixture_dir(std::string_view name) {
-  return fs::path{TEST_FIXTURE_DIR} / name;
-}
-
-inline fs::path fixture_ccj(std::string_view name) {
-  return fixture_dir(name) / "compile_commands.json";
-}
-
 }  // namespace xpto::blot::tests
