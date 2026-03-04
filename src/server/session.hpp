@@ -42,8 +42,8 @@ struct annotate_entry {
 };
 
 class session {
-  const fs::path* ccj_path;
-  const fs::path* project_root;
+  fs::path ccj_path;
+  fs::path project_root;
   mutable std::mutex cache_mutex;
   std::unordered_map<token_t, infer_entry> infer_cache_1;
   std::unordered_map<token_t, asm_entry> asm_cache_1;
@@ -75,7 +75,7 @@ class session {
   session& operator=(session&&) = delete;
   virtual ~session() = default;
 
-  session(const fs::path& ccj_path, const fs::path& project_root);
+  session(fs::path ccj_path, fs::path project_root);
 
   virtual void send(const json::object& msg) = 0;
 

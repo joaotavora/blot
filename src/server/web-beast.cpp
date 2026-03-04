@@ -40,9 +40,8 @@ struct ws_session : session {
   std::mutex write_mutex;
   std::atomic<bool> shutdown_requested{false};
 
-  ws_session(
-      stream_t ws, const fs::path& ccj_path, const fs::path& project_root)
-      : session{ccj_path, project_root}, ws{std::move(ws)} {
+  ws_session(stream_t ws, fs::path ccj_path, fs::path project_root)
+  : session{std::move(ccj_path), std::move(project_root)}, ws{std::move(ws)} {
     this->ws.text(true);
   }
 
@@ -139,7 +138,7 @@ int run_web_server(
   int bound_port = static_cast<int>(acceptor.local_endpoint().port());
 
   net::co_spawn(
-      ex, accept_loop(std::move(acceptor), ccj_path, project_root),
+      ex, accept_loop(std::move(acceptor), ccj_path, std::move(project_root)),
       net::detached);
   return bound_port;
 }

@@ -52,8 +52,8 @@ static annotation_options parse_aopts(const json::object* opts) {
 
 /// session members
 
-session::session(const fs::path& ccj_path, const fs::path& project_root)
-    : ccj_path{&ccj_path}, project_root{&project_root} {}
+session::session(fs::path ccj_path, fs::path project_root)
+: ccj_path{std::move(ccj_path)}, project_root{std::move(project_root)} {}
 
 void session::reply_(const json::value& id, const jsonrpc_response_t& res) {
   json::object msg = std::visit(
@@ -109,8 +109,8 @@ jsonrpc_response_t session::handle_initialize(
   server_info["name"] = "blot";
   server_info["version"] = "0.1";
   result["serverInfo"] = std::move(server_info);
-  result["ccj"] = ccj_path->string();
-  result["project_root"] = project_root->string();
+  result["ccj"] = ccj_path.string();
+  result["project_root"] = project_root.string();
   return result;
 }
 
@@ -151,8 +151,8 @@ jsonrpc_response_t session::handle_infer(
   std::string file_str{params.at("file").as_string()};
 
   std::error_code ec{};
-  auto abs_file = fs::weakly_canonical(*project_root / file_str, ec);
-  if (ec || !abs_file.string().starts_with(project_root->string()))
+  auto abs_file = fs::weakly_canonical(project_root / file_str, ec);
+  if (ec || !abs_file.string().starts_with(project_root.string()))
     return error{-32602, "path traversal denied"};
 
   send_progress("infer", "running");
@@ -160,7 +160,7 @@ jsonrpc_response_t session::handle_infer(
 
   std::optional<compile_command> cmd{};
   try {
-    cmd = infer(*ccj_path, abs_file);
+    cmd = infer(ccj_path, abs_file);
   } catch (std::exception& e) {
     auto ms = duration_ms(t0);
     send_progress("infer", "error", ms);
