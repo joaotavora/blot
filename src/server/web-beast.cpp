@@ -72,6 +72,9 @@ net::awaitable<void> process_frame(
 net::awaitable<void> run_session(std::shared_ptr<ws_session> sess) {
   auto ex = co_await net::this_coro::executor;
   for (;;) {
+    // FIXME: shutdown_requested is never observed while suspended in
+    // read_frame() — shutdown only takes effect after the next frame arrives.
+    // Consider using async_close + catching the resulting error instead.
     if (sess->shutdown_requested.load(std::memory_order_relaxed)) break;
     auto text = co_await sess->read_frame();
     net::co_spawn(ex, process_frame(sess, std::move(text)), net::detached);

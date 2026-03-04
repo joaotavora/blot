@@ -151,6 +151,9 @@ response_t dispatch(
   }
 
   if (req.method() == http::verb::get && target == "/api/status") {
+    // FIXME: reads and fully parses the entire compile_commands.json on every
+    // poll just to get the array length.  Cache the count (or the parsed
+    // value) and invalidate on file modification time change.
     std::error_code ec;
     auto entries = json::parse(
         [&]() -> std::string {
@@ -166,6 +169,9 @@ response_t dispatch(
   }
 
   if (req.method() == http::verb::get && target == "/api/files") {
+    // FIXME: list_source_files() either forks git or walks the directory tree
+    // on every request with no caching.  Cache the result and invalidate on
+    // a directory-level mtime/inotify change.
     auto srcs = list_source_files(project_root);
     json::object obj;
     json::array arr(srcs.begin(), srcs.end());

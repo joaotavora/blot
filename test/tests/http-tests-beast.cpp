@@ -31,6 +31,8 @@ struct beast_http_client : http_client {
 
   net::awaitable<http_response> get(std::string_view path) override {
     auto ex = co_await net::this_coro::executor;
+    // FIXME: DNS resolve + new TCP connection opened on every get() call.
+    // For the shared http_srv() tests, reuse a persistent connection instead.
     tcp::resolver resolver{ex};
     beast::tcp_stream stream{ex};
 

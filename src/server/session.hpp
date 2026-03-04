@@ -45,6 +45,8 @@ class session {
   fs::path ccj_path;
   fs::path project_root;
   mutable std::mutex cache_mutex;
+  // FIXME: all four caches are unbounded — no eviction or capacity cap.
+  // Long-running sessions or projects with many TUs will grow without limit.
   std::unordered_map<token_t, infer_entry> infer_cache_1;
   std::unordered_map<token_t, asm_entry> asm_cache_1;
   std::unordered_map<std::string, std::pair<int, asm_entry>> asm_cache_2;
