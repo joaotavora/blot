@@ -9,6 +9,7 @@
 #include <tuple>
 #include <vector>
 
+#include "http-tests.hpp"
 #include "session.hpp"
 
 namespace json = boost::json;
@@ -28,14 +29,6 @@ struct jsonrpc_error : std::runtime_error {
         code{static_cast<int>(err.at("code").as_int64())},
         message{err.at("message").as_string()} {}
 };
-
-fs::path fixture_dir(std::string_view name) {
-  return fs::path{TEST_FIXTURE_DIR} / name;
-}
-
-fs::path fixture_ccj(std::string_view name) {
-  return fixture_dir(name) / "compile_commands.json";
-}
 
 struct mock_session : session {
   mock_session(const fs::path& ccj, const fs::path& root)
@@ -68,9 +61,7 @@ struct mock_session : session {
   }
 
   std::vector<json::object> pop_notifications() {
-    auto n = std::move(notifications_);
-    notifications_.clear();
-    return n;
+    return std::move(notifications_);
   }
 
  private:
