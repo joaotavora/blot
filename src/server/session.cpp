@@ -136,10 +136,12 @@ jsonrpc_response_t session::handle_infer(
       }
     }
     if (cached) {
+      LOG_DEBUG("infer cache hit: token={}", tok);
       send_progress("infer", "running");
       send_progress("infer", "cached", 0);
       return *cached;
     }
+    LOG_DEBUG("infer cache miss: token={} not found", tok);
     return error{-32602, "token not found in infer cache"};
   }
 
@@ -155,6 +157,7 @@ jsonrpc_response_t session::handle_infer(
   if (ec || !abs_file.string().starts_with(project_root.string()))
     return error{-32602, "path traversal denied"};
 
+  LOG_DEBUG("infer: token={}, file={}", tok, file_str);
   send_progress("infer", "running");
   auto t0 = clock_t::now();
 
@@ -181,6 +184,7 @@ jsonrpc_response_t session::handle_infer(
   {
     std::lock_guard lk{cache_mutex};
     infer_cache_1[tok] = infer_entry{*cmd};
+    LOG_DEBUG("infer cache store: token={}, file={}", tok, cmd->file.string());
   }
 
   json::object result{};
@@ -207,6 +211,7 @@ jsonrpc_response_t session::handle_grabasm(
     if (params.contains("token")) {
       tok = params.at("token").as_int64();
       if (auto it = asm_cache_1.find(tok); it != asm_cache_1.end()) {
+        LOG_DEBUG("grabasm cache hit (asm_cache_1): token={}", tok);
         json::object result{};
         result["token"] = tok;
         result["cached"] = "token";
@@ -238,6 +243,7 @@ jsonrpc_response_t session::handle_grabasm(
       cache_key = cmd.command + '\0' + cmd.directory.string();
       if (auto it = asm_cache_2.find(cache_key); it != asm_cache_2.end()) {
         int cached_tok{it->second.first};
+        LOG_DEBUG("grabasm cache hit (asm_cache_2): tok={} -> cached_tok={}", tok, cached_tok);
         const auto& cr = it->second.second.result;
         json::object result{};
         result["token"] = cached_tok;
@@ -289,6 +295,7 @@ jsonrpc_response_t session::handle_grabasm(
     std::lock_guard lk{cache_mutex};
     asm_cache_1[tok] = entry;
     asm_cache_2[cache_key] = {tok, entry};
+    LOG_DEBUG("grabasm cache store: token={}, dir={}", tok, cmd.directory.string());
   }
 
   json::object result{};
@@ -336,6 +343,7 @@ jsonrpc_response_t session::handle_annotate(
       }
     }
     if (cached) {
+      LOG_DEBUG("annotate cache hit: token={}", tok);
       send_progress("annotate", "running");
       send_progress("annotate", "cached", 0);
       return *cached;
@@ -367,6 +375,7 @@ jsonrpc_response_t session::handle_annotate(
   {
     std::lock_guard lk{cache_mutex};
     annotate_cache_1[tok] = annotate_entry{annotated};
+    LOG_DEBUG("annotate cache store: token={}", tok);
   }
 
   json::object result{std::move(annotated)};
