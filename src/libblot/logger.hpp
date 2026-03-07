@@ -28,7 +28,7 @@ inline std::string_view level_to_string(level level) {
   // clang-format on
 }
 
-inline level global_level = level::info;  // NOLINT
+inline level global_level = level::fatal;  // NOLINT
 inline void set_level(level level) { global_level = level; }
 
 inline std::string get_current_timestamp() {
@@ -61,32 +61,62 @@ inline void log(
 }  // namespace xpto::logger
 
 // NOLINTBEGIN
-#define LOG_TRACE(...)                                             \
-  xpto::logger::log(                                               \
-      xpto::logger::level::trace, std::source_location::current(), \
-      __VA_ARGS__)
+// BLOT_LOG_MAX_LEVEL controls compile-time logging ceiling (0=fatal..5=trace).
+// If not defined, all log macros are no-ops.
+#ifndef BLOT_LOG_MAX_LEVEL
+#define BLOT_LOG_MAX_LEVEL 5
+#endif
 
-#define LOG_DEBUG(...)                                             \
-  xpto::logger::log(                                               \
-      xpto::logger::level::debug, std::source_location::current(), \
-      __VA_ARGS__)
+#if BLOT_LOG_MAX_LEVEL >= 5
+#  define LOG_TRACE(...)                                             \
+     xpto::logger::log(                                               \
+         xpto::logger::level::trace, std::source_location::current(), \
+         __VA_ARGS__)
+#else
+#  define LOG_TRACE(...) ((void)0)
+#endif
 
-#define LOG_INFO(...) \
-  xpto::logger::log(  \
-      xpto::logger::level::info, std::source_location::current(), __VA_ARGS__)
+#if BLOT_LOG_MAX_LEVEL >= 4
+#  define LOG_DEBUG(...)                                             \
+     xpto::logger::log(                                               \
+         xpto::logger::level::debug, std::source_location::current(), \
+         __VA_ARGS__)
+#else
+#  define LOG_DEBUG(...) ((void)0)
+#endif
 
-#define LOG_WARN(...)                                                \
-  xpto::logger::log(                                                 \
-      xpto::logger::level::warning, std::source_location::current(), \
-      __VA_ARGS__)
+#if BLOT_LOG_MAX_LEVEL >= 3
+#  define LOG_INFO(...)  \
+     xpto::logger::log(  \
+         xpto::logger::level::info, std::source_location::current(), __VA_ARGS__)
+#else
+#  define LOG_INFO(...) ((void)0)
+#endif
 
-#define LOG_ERROR(...)                                             \
-  xpto::logger::log(                                               \
-      xpto::logger::level::error, std::source_location::current(), \
-      __VA_ARGS__)
+#if BLOT_LOG_MAX_LEVEL >= 2
+#  define LOG_WARN(...)                                                \
+     xpto::logger::log(                                                 \
+         xpto::logger::level::warning, std::source_location::current(), \
+         __VA_ARGS__)
+#else
+#  define LOG_WARN(...) ((void)0)
+#endif
 
-#define LOG_FATAL(...)                                             \
-  xpto::logger::log(                                               \
-      xpto::logger::level::fatal, std::source_location::current(), \
-      __VA_ARGS__)
+#if BLOT_LOG_MAX_LEVEL >= 1
+#  define LOG_ERROR(...)                                             \
+     xpto::logger::log(                                               \
+         xpto::logger::level::error, std::source_location::current(), \
+         __VA_ARGS__)
+#else
+#  define LOG_ERROR(...) ((void)0)
+#endif
+
+#if BLOT_LOG_MAX_LEVEL >= 0
+#  define LOG_FATAL(...)                                             \
+     xpto::logger::log(                                               \
+         xpto::logger::level::fatal, std::source_location::current(), \
+         __VA_ARGS__)
+#else
+#  define LOG_FATAL(...) ((void)0)
+#endif
 // NOLINTEND
