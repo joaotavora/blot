@@ -41,7 +41,7 @@ target_link_libraries(blot_lib PUBLIC
   ${CLANG_CPP}
   ${LLVM}
 )
-target_compile_definitions(blot_lib PUBLIC LOG_NO_TIMESTAMP BLOT_LOG_MAX_LEVEL=5)
+target_compile_definitions(blot_lib PUBLIC BLOT_LOG_MAX_LEVEL=5)
 
 # Server library (http,websockets and stdio)
 file(GLOB blot_server_lib_sources CONFIGURE_DEPENDS src/server/*.cpp)
