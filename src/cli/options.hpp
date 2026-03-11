@@ -13,6 +13,7 @@ struct file_options {
   std::optional<fs::path> asm_file_name{};
   std::optional<fs::path> src_file_name{};
   std::optional<fs::path> compile_commands_path{};
+  std::optional<fs::path> project_root{};
   bool web_mode{};
   bool stdio_mode{};
   int port{4242};

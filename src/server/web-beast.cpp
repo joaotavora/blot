@@ -131,8 +131,8 @@ net::awaitable<void> accept_loop(
 }
 
 int run_web_server(
-    const net::any_io_executor& ex, const fs::path& ccj_path, int port) {
-  fs::path project_root = fs::absolute(ccj_path).parent_path();
+    const net::any_io_executor& ex, const fs::path& ccj_path,
+    const fs::path& project_root, int port) {
 
   tcp::acceptor acceptor{
     ex, tcp::endpoint{tcp::v4(), static_cast<unsigned short>(port)}};

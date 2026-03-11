@@ -131,34 +131,30 @@ int main(int argc, char* argv[]) {
   xpto::logger::set_level(static_cast<xpto::logger::level>(loglevel));
   LOG_DEBUG("loglevel={}", loglevel);
 
-  auto ccj_or_die = [&](std::string_view blurb) {
-    if (fopts.compile_commands_path) {
-      return *fopts.compile_commands_path;
-    } else {
-      auto ccj = blot::find_ccj();
-      if (!ccj) {
-        std::cerr << "blot " << blurb
-                  << ": can't find compile_commands.json in cwd\n";
-        std::exit(-1);
-      }
-      return *ccj;
+  if (fopts.stdio_mode || fopts.web_mode) {
+    fs::path project_root = fs::absolute(
+        fopts.project_root.value_or(
+            fopts.src_file_name.value_or(fs::current_path())));
+
+    fs::path ccj = fopts.compile_commands_path.value_or(
+        project_root / "compile_commands.json");
+
+    if (!fs::exists(ccj)) {
+      std::cerr << "blot: can't find " << ccj << "\n";
+      return -1;
     }
-  };
 
-  if (fopts.stdio_mode) {
-    boost::asio::io_context ioc;
-    blot::run_stdio_server(ioc, ccj_or_die("--stdio"));
-    ioc.run();
-    return 0;
-  }
+    if (fopts.stdio_mode) {
+      boost::asio::io_context ioc;
+      blot::run_stdio_server(ioc, ccj, project_root);
+      ioc.run();
+      return 0;
+    }
 
-  if (fopts.web_mode) {
-    auto ccj = ccj_or_die("--web");
     boost::asio::thread_pool pool{4};
-    int port = blot::run_web_server(pool.get_executor(), ccj, fopts.port);
+    int port = blot::run_web_server(pool.get_executor(), ccj, project_root, fopts.port);
     fmt::println("blot --web: listening on http://localhost:{}", port);
-    fmt::println(
-        "  project root : {}", fs::absolute(ccj).parent_path().string());
+    fmt::println("  project root : {}", project_root.string());
     fmt::println("  ccj          : {}", ccj.string());
     fmt::println("  press Ctrl-C to stop");
     std::cout.flush();

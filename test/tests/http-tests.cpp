@@ -15,7 +15,9 @@ namespace xpto::blot::tests {
 struct http_fixture {
   net::io_context ioc;
   net::thread_pool pool{4};
-  test_server http_server{pool.get_executor(), fixture_ccj("gcc-minimal")};
+  test_server http_server{
+      pool.get_executor(), fixture_ccj("gcc-minimal"),
+      fixture_dir("gcc-minimal")};
 
   http_fixture() { fs::current_path(fixture_dir("gcc-minimal")); }
 };

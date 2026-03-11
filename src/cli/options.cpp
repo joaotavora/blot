@@ -37,10 +37,12 @@ std::optional<int> parse_options(
   app.add_option("-d, --debug", loglevel, "Debug log level (3=INFO)")
       ->capture_default_str();
   app.add_option(
-      "--asm-file", fopts.asm_file_name, "Read assembly directly from file");
+      "--asm-file", fopts.asm_file_name, "Read assembly directly from file")
+      ->type_name("ASM-FILE");
   app.add_option(
       "--compile_commands,--ccj", fopts.compile_commands_path,
-      "Path to compile_commands.json file");
+      "Path to compile_commands.json file")
+      ->type_name("CCJ-PATH");
   app.add_flag("--json", json_output, "Output results in JSON format")
       ->capture_default_str();
   app.add_flag("--web", fopts.web_mode, "Start HTTP server with browser UI")
@@ -53,8 +55,12 @@ std::optional<int> parse_options(
       ->capture_default_str();
   app.add_option(
       "--web-root", fopts.web_root,
-      "Serve static files from DIR instead of embedded HTML (for development)");
-  app.add_option("source-file", fopts.src_file_name, "Source file to annotate");
+      "Serve static files from DIR instead of embedded HTML (for development)")
+      ->type_name("DIR");
+  app.add_option(
+      "target", fopts.src_file_name,
+      "Source file to annotate (normal mode) or project root (--web/--stdio)")
+      ->type_name("FILE-OR-DIR");
 
   try {
     (app).parse(static_cast<int>(args.size()), args.data());

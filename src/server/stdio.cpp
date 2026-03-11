@@ -79,9 +79,9 @@ static net::awaitable<void> stdio_loop(
   LOG_INFO("stdio session ended");
 }
 
-void run_stdio_server(net::io_context& ioc, const fs::path& ccj_path) {
-  fs::path project_root = fs::absolute(ccj_path).parent_path();
-
+void run_stdio_server(
+    net::io_context& ioc, const fs::path& ccj_path,
+    const fs::path& project_root) {
   LOG_INFO("blot --stdio: project root: {}", project_root.string());
   LOG_INFO("blot --stdio: ccj          : {}", ccj_path.string());
 

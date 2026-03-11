@@ -10,6 +10,7 @@ namespace xpto::blot {
 // "shutdown" or stdin reaches EOF.  ccj_path must point to a valid
 // compile_commands.json file.
 void run_stdio_server(
-    boost::asio::io_context& ioc, const std::filesystem::path& ccj_path);
+    boost::asio::io_context& ioc, const std::filesystem::path& ccj_path,
+    const std::filesystem::path& project_root);
 
 }  // namespace xpto::blot

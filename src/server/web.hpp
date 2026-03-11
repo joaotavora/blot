@@ -10,6 +10,7 @@ namespace xpto::blot {
 // Does NOT run the executor — the caller is responsible for that.
 int run_web_server(
     const boost::asio::any_io_executor& ex,
-    const std::filesystem::path& ccj_path, int port);
+    const std::filesystem::path& ccj_path,
+    const std::filesystem::path& project_root, int port);
 
 }  // namespace xpto::blot

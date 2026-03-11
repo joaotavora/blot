@@ -36,8 +36,9 @@ struct test_server {
   int port;
   fs::path ccj;
 
-   explicit test_server(const net::any_io_executor& ex, fs::path ccj)
-  : port{xpto::blot::run_web_server(ex, ccj, 0)},
+  explicit test_server(
+      const net::any_io_executor& ex, fs::path ccj, fs::path project_root)
+  : port{xpto::blot::run_web_server(ex, ccj, project_root, 0)},
         ccj{std::move(ccj)} {}
 };
 
