@@ -13,6 +13,8 @@
 #include <boost/beast/websocket.hpp>
 #include <boost/json.hpp>
 #include <filesystem>
+#include <pthread.h>
+
 #include <memory>
 #include <mutex>
 #include <string>
@@ -47,7 +49,9 @@ struct ws_session : session {
 
   void send(const json::object& msg) override {
     auto text = json::serialize(msg);  // serialize before lock
+    LOG_INFO("ws_send wait lock tid={}", (unsigned long)pthread_self());
     std::lock_guard lk{write_mutex};
+    LOG_INFO("ws_send got lock  tid={}", (unsigned long)pthread_self());
     beast::error_code ec{};
     ws.write(net::buffer(text), ec);
     if (ec) LOG_INFO("ws_send error: {}", ec.message());
@@ -55,7 +59,9 @@ struct ws_session : session {
 
   net::awaitable<std::string> read_frame() {
     beast::flat_buffer buf{};
+    LOG_INFO("read_frame await tid={}", (unsigned long)pthread_self());
     co_await ws.async_read(buf, net::use_awaitable);
+    LOG_INFO("read_frame done  tid={}", (unsigned long)pthread_self());
     co_return beast::buffers_to_string(buf.data());
   }
 };
@@ -64,9 +70,12 @@ struct ws_session : session {
 
 net::awaitable<void> process_frame(
     std::shared_ptr<ws_session> sess, std::string text) {
+  auto ex = co_await net::this_coro::executor;
+  co_await net::post(ex, net::use_awaitable);
+  LOG_INFO("process_frame start tid={}", (unsigned long)pthread_self());
   if (!sess->handle_frame(text))
     sess->shutdown_requested.store(true, std::memory_order_relaxed);
-  co_return;
+  LOG_INFO("process_frame end   tid={}", (unsigned long)pthread_self());
 }
 
 net::awaitable<void> run_session(std::shared_ptr<ws_session> sess) {
@@ -77,6 +86,7 @@ net::awaitable<void> run_session(std::shared_ptr<ws_session> sess) {
     // Consider using async_close + catching the resulting error instead.
     if (sess->shutdown_requested.load(std::memory_order_relaxed)) break;
     auto text = co_await sess->read_frame();
+    LOG_INFO("frame in tid={}", (unsigned long)pthread_self());
     net::co_spawn(ex, process_frame(sess, std::move(text)), net::detached);
   }
   LOG_INFO("ws session ended");

@@ -1,5 +1,7 @@
 #include "session.hpp"
 
+#include <pthread.h>
+
 #include <atomic>
 #include <boost/json.hpp>
 #include <chrono>
@@ -201,6 +203,14 @@ jsonrpc_response_t session::handle_infer(
 jsonrpc_response_t session::handle_grabasm(
     const json::object& params,
     std::invocable<std::string_view, std::string_view> auto&& send_progress) {
+  static std::atomic<int> in_flight{0};
+  int n = ++in_flight;
+  LOG_INFO(
+      "grabasm ENTER tid={} in_flight={}", (unsigned long)pthread_self(), n);
+  struct guard {
+    ~guard() { --in_flight; }
+  } g;
+
   // Phase 1: locked cache check
   std::optional<json::object> cached;
   compile_command cmd;
@@ -267,6 +277,10 @@ jsonrpc_response_t session::handle_grabasm(
   send_progress("grabasm", "running");
   auto t0 = clock_t::now();
 
+  LOG_INFO(
+      "grabasm COMPILE start tid={} in_flight={}",
+      (unsigned long)pthread_self(), in_flight.load());
+
   compilation_result cr{};
   try {
     cr = get_asm(cmd);
@@ -287,6 +301,9 @@ jsonrpc_response_t session::handle_grabasm(
   }
 
   auto ms = duration_ms(t0);
+  LOG_INFO(
+      "grabasm COMPILE end   tid={} in_flight={} ms={}",
+      (unsigned long)pthread_self(), in_flight.load(), ms);
   send_progress("grabasm", "done", ms);
 
   // Phase 3: locked insert
