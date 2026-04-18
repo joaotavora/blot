@@ -533,9 +533,13 @@ createApp({
       annotate: { status: 'idle', elapsed_ms: null },
     });
 
-    // Last infer token so reannotate can skip infer+grabasm
-    const lastInferToken = ref(null);
-    const lastAsmToken = ref(null);
+    // Per-file asm token cache: filepath → { asmToken }
+    // Lets selectFile skip infer+grab_asm when returning to a visited file.
+    const fileCache = new Map();
+
+    // Incremented on every selectFile; guards against stale pipeline results
+    // landing on the display after the user has navigated away mid-cycle.
+    let pipelineGen = 0;
 
     let blotWS = null;
 
@@ -778,13 +782,13 @@ createApp({
       lineMappings.value = [];
       asmError.value = '';
       compilerInfo.value = '';
-      lastInferToken.value = null;
-      lastAsmToken.value = null;
       phases.value = {
         infer:    { status: 'idle', elapsed_ms: null },
         grabasm:  { status: 'idle', elapsed_ms: null },
         annotate: { status: 'idle', elapsed_ms: null },
       };
+
+      const myGen = ++pipelineGen;
 
       loadingSource.value = true;
       try {
@@ -796,10 +800,14 @@ createApp({
         }
       } finally { loadingSource.value = false; }
 
-      runPipeline(f);
+      const cached = fileCache.get(f);
+      if (cached?.asmToken != null)
+        reannotateWith(cached.asmToken, myGen);
+      else
+        runPipeline(f, myGen);
     }
 
-    async function runPipeline(file) {
+    async function runPipeline(file, gen) {
       if (!file || !blotWS) return;
       loadingAsm.value = true;
       asmError.value = '';
@@ -810,11 +818,12 @@ createApp({
       try {
         // Phase 1: infer
         const inferRes = await blotWS.call('blot/infer', { file });
-        lastInferToken.value = inferRes.token;
+        if (gen !== pipelineGen) return;
 
         // Phase 2: grab_asm
         const asmRes = await blotWS.call('blot/grab_asm', { token: inferRes.token });
-        lastAsmToken.value = asmRes.token;
+        if (gen !== pipelineGen) return;
+        fileCache.set(file, { asmToken: asmRes.token });
         if (asmRes.compilation_command) {
           const ci = asmRes.compilation_command;
           compilerInfo.value = `${ci.compiler}  ${ci.compiler_version}`;
@@ -825,6 +834,29 @@ createApp({
           token: asmRes.token,
           options: opts.value,
         });
+        if (gen !== pipelineGen) return;
+        asmLines.value = annRes.assembly || [];
+        lineMappings.value = annRes.line_mappings || [];
+      } catch (e) {
+        asmError.value = formatError(e);
+      } finally {
+        loadingAsm.value = false;
+      }
+    }
+
+    async function reannotateWith(asmToken, gen) {
+      if (!blotWS) return;
+      loadingAsm.value = true;
+      asmError.value = '';
+      asmLines.value = [];
+      lineMappings.value = [];
+      phases.value.annotate = { status: 'idle', elapsed_ms: null };
+      try {
+        const annRes = await blotWS.call('blot/annotate', {
+          token: asmToken,
+          options: opts.value,
+        });
+        if (gen !== pipelineGen) return;
         asmLines.value = annRes.assembly || [];
         lineMappings.value = annRes.line_mappings || [];
       } catch (e) {
@@ -836,28 +868,11 @@ createApp({
 
     async function reannotate() {
       if (!selectedFile.value || !blotWS) return;
-      // If we have a cached asm token, only re-annotate
-      if (lastAsmToken.value !== null) {
-        loadingAsm.value = true;
-        asmError.value = '';
-        asmLines.value = [];
-        lineMappings.value = [];
-        phases.value.annotate = { status: 'idle', elapsed_ms: null };
-        try {
-          const annRes = await blotWS.call('blot/annotate', {
-            token: lastAsmToken.value,
-            options: opts.value,
-          });
-          asmLines.value = annRes.assembly || [];
-          lineMappings.value = annRes.line_mappings || [];
-        } catch (e) {
-          asmError.value = formatError(e);
-        } finally {
-          loadingAsm.value = false;
-        }
-      } else {
-        runPipeline(selectedFile.value);
-      }
+      const cached = fileCache.get(selectedFile.value);
+      if (cached?.asmToken != null)
+        reannotateWith(cached.asmToken, pipelineGen);
+      else
+        runPipeline(selectedFile.value, ++pipelineGen);
     }
 
     // Init
