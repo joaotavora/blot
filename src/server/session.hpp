@@ -50,6 +50,9 @@ class session {
   std::unordered_map<token_t, infer_entry> infer_cache_1;
   std::unordered_map<token_t, asm_entry> asm_cache_1;
   std::unordered_map<std::string, std::pair<int, asm_entry>> asm_cache_2;
+  // No annotate_cache_2: callers reuse the token returned by a grab_asm
+  // "other" hit to get a token-cache hit here.  A content-keyed cache would
+  // also need to account for annotation_options, complicating the key.
   std::unordered_map<token_t, annotate_entry> annotate_cache_1;
 
   void reply_(const json::value& id, const jsonrpc_response_t& res);
