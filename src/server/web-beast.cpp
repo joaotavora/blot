@@ -49,6 +49,7 @@ struct ws_session : session {
 
   void send(const json::object& msg) override {
     auto text = json::serialize(msg);  // serialize before lock
+    LOG_DEBUG("ws <- {}", text);
     std::lock_guard lk{write_mutex};
     beast::error_code ec{};
     ws.write(net::buffer(text), ec);
@@ -66,6 +67,7 @@ struct ws_session : session {
 
 net::awaitable<void> process_frame(
     ws_session* sess, std::string text) {
+  LOG_DEBUG("ws -> {}", text);
   if (!sess->handle_frame(text))
     sess->shutdown_requested.store(true, std::memory_order_relaxed);
   co_return;
