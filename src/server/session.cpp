@@ -1,7 +1,5 @@
 #include "session.hpp"
 
-#include <pthread.h>
-
 #include <atomic>
 #include <boost/json.hpp>
 #include <chrono>
@@ -15,6 +13,7 @@
 #include "json_helpers.hpp"
 #include "linespan.hpp"
 #include "logger.hpp"
+#include "auto.hpp"
 
 namespace xpto::blot {
 
@@ -200,31 +199,10 @@ jsonrpc_response_t session::handle_infer(
   return result;
 }
 
-namespace testing {
-std::atomic<int>& grabasm_in_flight() {
-  static std::atomic<int> x{0};
-  return x;
-}
-std::atomic<int>& grabasm_high_water() {
-  static std::atomic<int> x{0};
-  return x;
-}
-int grabasm_max_concurrent() { return grabasm_high_water().load(); }
-void reset_grabasm_max_concurrent() { grabasm_high_water().store(0); }
-}  // namespace testing
-
 jsonrpc_response_t session::handle_grabasm(
     const json::object& params,
     std::invocable<std::string_view, std::string_view> auto&& send_progress) {
-  int n = ++testing::grabasm_in_flight();
-  int prev = testing::grabasm_high_water().load();
-  while (n > prev &&
-         !testing::grabasm_high_water().compare_exchange_weak(prev, n)) {}
-  LOG_INFO(
-      "grabasm ENTER tid={} in_flight={}", (unsigned long)pthread_self(), n);
-  struct guard {
-    ~guard() { --testing::grabasm_in_flight(); }
-  } g;
+  LOG_DEBUG("grabasm ENTER in_flight={}", testing::inflight_frames().load());
 
   // Phase 1: locked cache check
   std::optional<json::object> cached;
@@ -292,9 +270,7 @@ jsonrpc_response_t session::handle_grabasm(
   send_progress("grabasm", "running");
   auto t0 = clock_t::now();
 
-  LOG_INFO(
-      "grabasm COMPILE start tid={} in_flight={}",
-      (unsigned long)pthread_self(), testing::grabasm_in_flight().load());
+  LOG_DEBUG("grabasm COMPILE start in_flight={}", testing::inflight_frames().load());
 
   compilation_result cr{};
   try {
@@ -316,9 +292,7 @@ jsonrpc_response_t session::handle_grabasm(
   }
 
   auto ms = duration_ms(t0);
-  LOG_INFO(
-      "grabasm COMPILE end   tid={} in_flight={} ms={}",
-      (unsigned long)pthread_self(), testing::grabasm_in_flight().load(), ms);
+  LOG_DEBUG("grabasm COMPILE end in_flight={} ms={}", testing::inflight_frames().load(), ms);
   send_progress("grabasm", "done", ms);
 
   // Phase 3: locked insert
@@ -418,14 +392,14 @@ jsonrpc_response_t session::handle_annotate(
 
 bool session::handle_frame(std::string_view text) {
   json::value msg_val{};
-  {
-    std::error_code jec{};
-    msg_val = json::parse(text, jec);
-    if (jec) {
-      LOG_WARN("Ignoring odd JSONRPC frame: {}", text);
-      return true;
-    }
+{
+  std::error_code jec{};
+  msg_val = json::parse(text, jec);
+  if (jec) {
+    LOG_WARN("Ignoring odd JSONRPC frame: {}", text);
+    return true;
   }
+}
 
   auto* msg = msg_val.if_object();
   if (!msg) {
@@ -452,10 +426,15 @@ bool session::handle_frame(std::string_view text) {
   LOG_INFO("ws rpc: {}", method);
 
   auto sp = [this, &id](
-                std::string_view phase, std::string_view status,
-                std::optional<long long> ms = std::nullopt) {
+      std::string_view phase, std::string_view status,
+      std::optional<long long> ms = std::nullopt) {
     send_progress_(id, phase, status, ms);
   };
+
+  int n = ++testing::inflight_frames();
+  int prev = testing::inflight_high_water().load();
+  while (n > prev && !testing::inflight_high_water().compare_exchange_weak(prev, n)) {}
+  AUTO(--testing::inflight_frames());
 
   if (method == "initialize") {
     reply_(id, handle_initialize(params, sp));

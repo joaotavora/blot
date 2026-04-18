@@ -112,7 +112,7 @@ TEST_CASE_FIXTURE(http_fixture, "server_http_files_source_not_found") {
 }
 
 TEST_CASE_FIXTURE(http_fixture, "server_ws_concurrent_grab_asm") {
-  testing::reset_grabasm_max_concurrent();
+  testing::inflight_high_water() = 0;
   run_ioc_test(ioc, [&]() -> net::awaitable<void> {
     auto ws = co_await connect_ws(http_server.port);
 
@@ -138,9 +138,10 @@ TEST_CASE_FIXTURE(http_fixture, "server_ws_concurrent_grab_asm") {
     REQUIRE(!infer_resp.contains("error"));
     auto token = infer_resp.at("result").as_object().at("token").as_int64();
 
-    // Fire N grab_asm requests back-to-back without reading any response.
-    // The server co_spawns each as a separate coroutine on the thread pool,
-    // so all N compilations should run concurrently.
+    // Fire N grab_asm requests back-to-back without reading any
+    // response.  The server posts+co_spawns each as a separate
+    // coroutine on the thread pool, so all N compilations should run
+    // concurrently.
     constexpr int N = 4;
     for (int i = 0; i < N; ++i) {
       json::object p{};
@@ -160,7 +161,7 @@ TEST_CASE_FIXTURE(http_fixture, "server_ws_concurrent_grab_asm") {
   }());
   // Must have observed at least 2 handlers in flight simultaneously;
   // anything less means the server serialized them.
-  CHECK(testing::grabasm_max_concurrent() >= 2);
+  CHECK(testing::inflight_high_water() >= 2);
 }
 
 }  // namespace xpto::blot::tests

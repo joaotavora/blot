@@ -1,6 +1,5 @@
 #define BOOST_ASIO_NO_DEPRECATED
 #include <fmt/core.h>
-#include <pthread.h>
 
 #include <boost/asio/awaitable.hpp>
 #include <boost/asio/co_spawn.hpp>
@@ -50,9 +49,7 @@ struct ws_session : session {
 
   void send(const json::object& msg) override {
     auto text = json::serialize(msg);  // serialize before lock
-    LOG_INFO("ws_send wait lock tid={}", (unsigned long)pthread_self());
     std::lock_guard lk{write_mutex};
-    LOG_INFO("ws_send got lock  tid={}", (unsigned long)pthread_self());
     beast::error_code ec{};
     ws.write(net::buffer(text), ec);
     if (ec) LOG_INFO("ws_send error: {}", ec.message());
@@ -60,9 +57,7 @@ struct ws_session : session {
 
   net::awaitable<std::string> read_frame() {
     beast::flat_buffer buf{};
-    LOG_INFO("read_frame await tid={}", (unsigned long)pthread_self());
     co_await ws.async_read(buf, net::use_awaitable);
-    LOG_INFO("read_frame done  tid={}", (unsigned long)pthread_self());
     co_return beast::buffers_to_string(buf.data());
   }
 };
@@ -71,10 +66,8 @@ struct ws_session : session {
 
 net::awaitable<void> process_frame(
     ws_session* sess, std::string text) {
-  LOG_INFO("process_frame start tid={}", (unsigned long)pthread_self());
   if (!sess->handle_frame(text))
     sess->shutdown_requested.store(true, std::memory_order_relaxed);
-  LOG_INFO("process_frame end   tid={}", (unsigned long)pthread_self());
   co_return;
 }
 
@@ -86,8 +79,6 @@ net::awaitable<void> run_session(std::unique_ptr<ws_session> sess) {
     // Consider using async_close + catching the resulting error instead.
     if (sess->shutdown_requested.load(std::memory_order_relaxed)) break;
     auto text = co_await sess->read_frame();
-    LOG_INFO("frame in tid={}", (unsigned long)pthread_self());
-
     net::post(
         ex, [text = std::move(text), sess = sess.get(), ex] () mutable {
           net::co_spawn(
