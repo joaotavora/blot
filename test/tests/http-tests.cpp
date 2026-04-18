@@ -260,7 +260,8 @@ TEST_CASE_FIXTURE(http_fixture, "server_ws_second_cycle_cache_hits") {
     auto tok_returned = asm2_result.at("token").as_int64();
     CHECK(tok_returned == tok1);
 
-    // annotate has no content-keyed cache; it rides on tok1 from the "other" hit
+    // annotate has no content-keyed cache; in this somewhat
+    // unrealistic example it "rides" on tok1 from the "other" hit.
     co_await ws_send(ws.get(), 7, "blot/annotate", {{"token", tok_returned}});
     auto ann2 = co_await ws->recv_response();
     REQUIRE(!ann2.contains("error"));

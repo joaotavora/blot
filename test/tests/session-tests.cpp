@@ -357,6 +357,28 @@ TEST_CASE_FIXTURE(gcc_minimal_fixture, "server_cache_other_inference") {
   CHECK(asm2.at("token").as_int64() == tok);
 }
 
+TEST_CASE_FIXTURE(gcc_minimal_fixture, "server_cache_annotate_options") {
+  auto [infer_tok, asm_tok, ann_tok] = run_pipeline(sess);  // cold, demangle=false
+
+  // Same token, different options → must miss the cache (key includes options)
+  json::object p2{};
+  p2["token"] = asm_tok;
+  json::object opts2{};
+  opts2["demangle"] = true;  // different from run_pipeline's false
+  p2["options"] = std::move(opts2);
+  auto res2 = sess.call("blot/annotate", p2);
+  CHECK(res2.at("cached").as_bool() == false);
+
+  // Same token, original options → "token" hit
+  json::object p3{};
+  p3["token"] = asm_tok;
+  json::object opts3{};
+  opts3["demangle"] = false;
+  p3["options"] = std::move(opts3);
+  auto res3 = sess.call("blot/annotate", p3);
+  CHECK(std::string{res3.at("cached").as_string()} == "token");
+}
+
 TEST_CASE_FIXTURE(gcc_minimal_fixture, "server_cache_other_pipelines") {
   sess.call("initialize");
 

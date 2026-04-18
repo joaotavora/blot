@@ -37,6 +37,7 @@ struct annotation_options {
   bool preserve_library_functions{};
   bool preserve_unused_labels{};
   bool demangle{};
+  bool operator==(const annotation_options&) const = default;
 };
 
 /** @brief Line-number type for mapping structures. */

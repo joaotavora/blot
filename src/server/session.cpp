@@ -207,7 +207,7 @@ jsonrpc_response_t session::handle_grabasm(
   // Phase 1: locked cache check
   std::optional<json::object> cached;
   compile_command cmd;
-  std::string cache_key;
+  asm_cache_key cache_key;
   token_t tok{};
   {
     std::lock_guard lk{cache_mutex};
@@ -243,7 +243,7 @@ jsonrpc_response_t session::handle_grabasm(
     }
 
     if (!cached) {
-      cache_key = cmd.command + '\0' + cmd.directory.string();
+      cache_key = {cmd.command, cmd.directory};
       if (auto it = asm_cache_2.find(cache_key); it != asm_cache_2.end()) {
         int cached_tok{it->second.first};
         LOG_DEBUG("grabasm cache hit (asm_cache_2): tok={} -> cached_tok={}", tok, cached_tok);
@@ -335,7 +335,7 @@ jsonrpc_response_t session::handle_annotate(
     std::optional<json::object> cached;
     {
       std::lock_guard lk{cache_mutex};
-      if (auto it = annotate_cache_1.find(tok); it != annotate_cache_1.end()) {
+      if (auto it = annotate_cache_1.find({tok, aopts}); it != annotate_cache_1.end()) {
         json::object result{it->second.annotated};
         result["token"] = tok;
         result["cached"] = "token";
@@ -380,7 +380,7 @@ jsonrpc_response_t session::handle_annotate(
   // Phase 3: locked insert
   {
     std::lock_guard lk{cache_mutex};
-    annotate_cache_1[tok] = annotate_entry{annotated};
+    annotate_cache_1[{tok, aopts}] = annotate_entry{annotated};
     LOG_DEBUG("annotate cache store: token={}", tok);
   }
 
