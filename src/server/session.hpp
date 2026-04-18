@@ -84,4 +84,11 @@ class session {
   bool handle_frame(std::string_view text);
 };
 
+namespace testing {
+/// Peak number of handle_grabasm invocations that were simultaneously
+/// in flight since the last reset.  Used by concurrency tests.
+int grabasm_max_concurrent();
+void reset_grabasm_max_concurrent();
+}  // namespace testing
+
 }  // namespace xpto::blot

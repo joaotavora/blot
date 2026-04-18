@@ -1,5 +1,6 @@
 #include "http-tests.hpp"
 #include "fixture.hpp"
+#include "session.hpp"
 
 #include <doctest/doctest.h>
 
@@ -111,6 +112,7 @@ TEST_CASE_FIXTURE(http_fixture, "server_http_files_source_not_found") {
 }
 
 TEST_CASE_FIXTURE(http_fixture, "server_ws_concurrent_grab_asm") {
+  testing::reset_grabasm_max_concurrent();
   run_ioc_test(ioc, [&]() -> net::awaitable<void> {
     auto ws = co_await connect_ws(http_server.port);
 
@@ -138,7 +140,7 @@ TEST_CASE_FIXTURE(http_fixture, "server_ws_concurrent_grab_asm") {
 
     // Fire N grab_asm requests back-to-back without reading any response.
     // The server co_spawns each as a separate coroutine on the thread pool,
-    // so all N compilations (or cache lookups) can run concurrently.
+    // so all N compilations should run concurrently.
     constexpr int N = 4;
     for (int i = 0; i < N; ++i) {
       json::object p{};
@@ -156,6 +158,9 @@ TEST_CASE_FIXTURE(http_fixture, "server_ws_concurrent_grab_asm") {
       CHECK(resps.at(id).at("result").as_object().contains("token"));
     }
   }());
+  // Must have observed at least 2 handlers in flight simultaneously;
+  // anything less means the server serialized them.
+  CHECK(testing::grabasm_max_concurrent() >= 2);
 }
 
 }  // namespace xpto::blot::tests

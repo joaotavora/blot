@@ -200,15 +200,30 @@ jsonrpc_response_t session::handle_infer(
   return result;
 }
 
+namespace testing {
+std::atomic<int>& grabasm_in_flight() {
+  static std::atomic<int> x{0};
+  return x;
+}
+std::atomic<int>& grabasm_high_water() {
+  static std::atomic<int> x{0};
+  return x;
+}
+int grabasm_max_concurrent() { return grabasm_high_water().load(); }
+void reset_grabasm_max_concurrent() { grabasm_high_water().store(0); }
+}  // namespace testing
+
 jsonrpc_response_t session::handle_grabasm(
     const json::object& params,
     std::invocable<std::string_view, std::string_view> auto&& send_progress) {
-  static std::atomic<int> in_flight{0};
-  int n = ++in_flight;
+  int n = ++testing::grabasm_in_flight();
+  int prev = testing::grabasm_high_water().load();
+  while (n > prev &&
+         !testing::grabasm_high_water().compare_exchange_weak(prev, n)) {}
   LOG_INFO(
       "grabasm ENTER tid={} in_flight={}", (unsigned long)pthread_self(), n);
   struct guard {
-    ~guard() { --in_flight; }
+    ~guard() { --testing::grabasm_in_flight(); }
   } g;
 
   // Phase 1: locked cache check
@@ -279,7 +294,7 @@ jsonrpc_response_t session::handle_grabasm(
 
   LOG_INFO(
       "grabasm COMPILE start tid={} in_flight={}",
-      (unsigned long)pthread_self(), in_flight.load());
+      (unsigned long)pthread_self(), testing::grabasm_in_flight().load());
 
   compilation_result cr{};
   try {
@@ -303,7 +318,7 @@ jsonrpc_response_t session::handle_grabasm(
   auto ms = duration_ms(t0);
   LOG_INFO(
       "grabasm COMPILE end   tid={} in_flight={} ms={}",
-      (unsigned long)pthread_self(), in_flight.load(), ms);
+      (unsigned long)pthread_self(), testing::grabasm_in_flight().load(), ms);
   send_progress("grabasm", "done", ms);
 
   // Phase 3: locked insert

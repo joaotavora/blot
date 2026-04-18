@@ -1,10 +1,12 @@
 #define BOOST_ASIO_NO_DEPRECATED
 #include <fmt/core.h>
+#include <pthread.h>
 
 #include <boost/asio/awaitable.hpp>
 #include <boost/asio/co_spawn.hpp>
 #include <boost/asio/detached.hpp>
 #include <boost/asio/ip/tcp.hpp>
+#include <boost/asio/post.hpp>
 #include <boost/asio/thread_pool.hpp>
 #include <boost/asio/use_awaitable.hpp>
 #include <boost/beast/core.hpp>
@@ -13,8 +15,6 @@
 #include <boost/beast/websocket.hpp>
 #include <boost/json.hpp>
 #include <filesystem>
-#include <pthread.h>
-
 #include <memory>
 #include <mutex>
 #include <string>
@@ -43,7 +43,8 @@ struct ws_session : session {
   std::atomic<bool> shutdown_requested{false};
 
   ws_session(stream_t ws, fs::path ccj_path, fs::path project_root)
-  : session{std::move(ccj_path), std::move(project_root)}, ws{std::move(ws)} {
+      : session{std::move(ccj_path), std::move(project_root)},
+        ws{std::move(ws)} {
     this->ws.text(true);
   }
 
@@ -69,16 +70,15 @@ struct ws_session : session {
 /// Session coroutines
 
 net::awaitable<void> process_frame(
-    std::shared_ptr<ws_session> sess, std::string text) {
-  auto ex = co_await net::this_coro::executor;
-  co_await net::post(ex, net::use_awaitable);
+    ws_session* sess, std::string text) {
   LOG_INFO("process_frame start tid={}", (unsigned long)pthread_self());
   if (!sess->handle_frame(text))
     sess->shutdown_requested.store(true, std::memory_order_relaxed);
   LOG_INFO("process_frame end   tid={}", (unsigned long)pthread_self());
+  co_return;
 }
 
-net::awaitable<void> run_session(std::shared_ptr<ws_session> sess) {
+net::awaitable<void> run_session(std::unique_ptr<ws_session> sess) {
   auto ex = co_await net::this_coro::executor;
   for (;;) {
     // FIXME: shutdown_requested is never observed while suspended in
@@ -87,7 +87,13 @@ net::awaitable<void> run_session(std::shared_ptr<ws_session> sess) {
     if (sess->shutdown_requested.load(std::memory_order_relaxed)) break;
     auto text = co_await sess->read_frame();
     LOG_INFO("frame in tid={}", (unsigned long)pthread_self());
-    net::co_spawn(ex, process_frame(sess, std::move(text)), net::detached);
+
+    net::post(
+        ex, [text = std::move(text), sess = sess.get(), ex] () mutable {
+          net::co_spawn(
+              ex, process_frame(sess, std::move(text)),
+              net::detached);
+        });
   }
   LOG_INFO("ws session ended");
 }
@@ -108,7 +114,7 @@ net::awaitable<void> handle_connection(
       co_await ws.async_accept(req, net::use_awaitable);
       LOG_INFO("ws session started");
       auto sess =
-          std::make_shared<ws_session>(std::move(ws), ccj_path, project_root);
+          std::make_unique<ws_session>(std::move(ws), ccj_path, project_root);
       co_await run_session(std::move(sess));
       co_return;
     }
@@ -143,7 +149,6 @@ net::awaitable<void> accept_loop(
 int run_web_server(
     const net::any_io_executor& ex, const fs::path& ccj_path,
     const fs::path& project_root, int port) {
-
   tcp::acceptor acceptor{
     ex, tcp::endpoint{tcp::v4(), static_cast<unsigned short>(port)}};
   acceptor.set_option(net::socket_base::reuse_address{true});
@@ -151,7 +156,7 @@ int run_web_server(
   int bound_port = static_cast<int>(acceptor.local_endpoint().port());
 
   net::co_spawn(
-      ex, accept_loop(std::move(acceptor), ccj_path, std::move(project_root)),
+      ex, accept_loop(std::move(acceptor), ccj_path, project_root),
       net::detached);
   return bound_port;
 }
