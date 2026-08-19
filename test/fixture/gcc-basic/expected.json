@@ -11,7 +11,7 @@
     "source_file": "source.cpp"
   },
   "compiler_invocation": {
-    "compiler_version": "15.2.1",
+    "compiler_version": "16.2.1",
     "compiler": "/usr/bin/c++",
     "args": [
       "-std=c++23",
@@ -34,15 +34,17 @@
     "\t.string\t\"!\\n\"",
     "main:",
     "\tsubq\t$8, %rsp",
+    "\tmovl\t$13, %edx",
     "\tleaq\t.LC0(%rip), %rsi",
     "\tleaq\t_ZSt4cout(%rip), %rdi",
-    "\tcall\t_ZStlsISt11char_traitsIcEERSt13basic_ostreamIcT_ES5_PKc@PLT",
+    "\tcall\t_ZSt16__ostream_insertIcSt11char_traitsIcEERSt13basic_ostreamIT_T0_ES6_PKS3_l@PLT",
     "\tmovl\t$42, %esi",
-    "\tmovq\t%rax, %rdi",
+    "\tleaq\t_ZSt4cout(%rip), %rdi",
     "\tcall\t_ZNSolsEi@PLT",
+    "\tmovl\t$2, %edx",
     "\tleaq\t.LC1(%rip), %rsi",
     "\tmovq\t%rax, %rdi",
-    "\tcall\t_ZStlsISt11char_traitsIcEERSt13basic_ostreamIcT_ES5_PKc@PLT",
+    "\tcall\t_ZSt16__ostream_insertIcSt11char_traitsIcEERSt13basic_ostreamIT_T0_ES6_PKS3_l@PLT",
     "\txorl\t%eax, %eax",
     "\taddq\t$8, %rsp",
     "\tret"
@@ -56,7 +58,17 @@
     {
       "source_line": 5,
       "asm_start": 9,
-      "asm_end": 21
+      "asm_end": 9
+    },
+    {
+      "source_line": 5,
+      "asm_start": 14,
+      "asm_end": 16
+    },
+    {
+      "source_line": 5,
+      "asm_start": 21,
+      "asm_end": 23
     }
   ]
 }

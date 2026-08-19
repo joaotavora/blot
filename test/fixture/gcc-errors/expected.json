@@ -11,7 +11,7 @@
     "source_file": "source.cpp"
   },
   "compiler_invocation": {
-    "compiler_version": "15.2.1",
+    "compiler_version": "16.2.1",
     "compiler": "/usr/bin/c++",
     "args": [
       "-std=c++23",

@@ -11,7 +11,7 @@
     "source_file": "source.cpp"
   },
   "compiler_invocation": {
-    "compiler_version": "21.1.8",
+    "compiler_version": "22.1.8",
     "compiler": "/usr/bin/clang++",
     "args": [
       "-std=c++23",
