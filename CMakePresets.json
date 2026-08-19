@@ -13,7 +13,7 @@
       "name": "debug",
       "displayName": "Clang Debug + ASan/UBSan",
       "inherits": "base",
-      "binaryDir": "${sourceDir}/build-Debug",
+      "binaryDir": "${sourceDir}/build",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Debug",
         "CMAKE_C_COMPILER": "clang",
