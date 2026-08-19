@@ -66,14 +66,14 @@ struct ws_session : session {
 /// Session coroutines
 
 net::awaitable<void> process_frame(
-    ws_session* sess, std::string text) {
+    std::shared_ptr<ws_session> sess, std::string text) {
   LOG_DEBUG("ws -> {}", text);
   if (!sess->handle_frame(text))
     sess->shutdown_requested.store(true, std::memory_order_relaxed);
   co_return;
 }
 
-net::awaitable<void> run_session(std::unique_ptr<ws_session> sess) {
+net::awaitable<void> run_session(std::shared_ptr<ws_session> sess) {
   auto ex = co_await net::this_coro::executor;
   for (;;) {
     // FIXME: shutdown_requested is never observed while suspended in
@@ -82,9 +82,11 @@ net::awaitable<void> run_session(std::unique_ptr<ws_session> sess) {
     if (sess->shutdown_requested.load(std::memory_order_relaxed)) break;
     auto text = co_await sess->read_frame();
     net::post(
-        ex, [text = std::move(text), sess = sess.get(), ex] () mutable {
+        ex, [text = std::move(text), sess, ex] () mutable {
+          // sess is captured by value (shared_ptr) so the session outlives
+          // this detached task even if run_session's loop has since ended.
           net::co_spawn(
-              ex, process_frame(sess, std::move(text)),
+              ex, process_frame(std::move(sess), std::move(text)),
               net::detached);
         });
   }
@@ -107,7 +109,7 @@ net::awaitable<void> handle_connection(
       co_await ws.async_accept(req, net::use_awaitable);
       LOG_INFO("ws session started");
       auto sess =
-          std::make_unique<ws_session>(std::move(ws), ccj_path, project_root);
+          std::make_shared<ws_session>(std::move(ws), ccj_path, project_root);
       co_await run_session(std::move(sess));
       co_return;
     }

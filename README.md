@@ -217,7 +217,11 @@ for tests).
   very rough.  It serves a Vue 3 single-page app backed by a
   JSONRPC/WebSocket server.  Many things are missing.  Concurrency
   (i.e. jumping around before a source file has finished annotating)
-  probably very broken.
+  probably very broken.  Confirmed under ASan: a detached
+  `process_frame` task can outlive the `ws_session` owning
+  `run_session`'s frame-reading loop, causing a use-after-free once
+  that stale task tries to send a progress notification through the
+  already-destroyed session.
 
 * *30%* Editor tooling
 
