@@ -2,10 +2,13 @@
 #include <fmt/core.h>
 
 #include <boost/asio/awaitable.hpp>
+#include <boost/asio/bind_cancellation_slot.hpp>
+#include <boost/asio/cancellation_signal.hpp>
 #include <boost/asio/co_spawn.hpp>
 #include <boost/asio/detached.hpp>
 #include <boost/asio/ip/tcp.hpp>
 #include <boost/asio/post.hpp>
+#include <boost/asio/this_coro.hpp>
 #include <boost/asio/thread_pool.hpp>
 #include <boost/asio/use_awaitable.hpp>
 #include <boost/beast/core.hpp>
@@ -18,6 +21,7 @@
 #include <mutex>
 #include <string>
 
+#include "auto.hpp"
 #include "logger.hpp"
 #include "session.hpp"
 #include "web-dispatch.hpp"
@@ -40,6 +44,11 @@ struct ws_session : session {
   stream_t ws;
   std::mutex write_mutex;
   std::atomic<bool> shutdown_requested{false};
+  // Guards cancel_sig: boost::asio::cancellation_signal forbids concurrent
+  // slot connection and emit(), which can otherwise happen from different
+  // thread-pool threads here.
+  std::mutex cancel_mutex;
+  net::cancellation_signal cancel_sig;
 
   ws_session(stream_t ws, fs::path ccj_path, fs::path project_root)
       : session{std::move(ccj_path), std::move(project_root)},
@@ -67,13 +76,28 @@ struct ws_session : session {
 
 net::awaitable<void> process_frame(
     std::shared_ptr<ws_session> sess, std::string text) {
+  auto state = co_await net::this_coro::cancellation_state;
+  if (state.cancelled() != net::cancellation_type::none) {
+    // The owning run_session loop has already ended (e.g. the client
+    // disconnected); don't bother compiling/annotating for a dead session.
+    LOG_DEBUG("dropping frame on closed session: {}", text);
+    co_return;
+  }
   LOG_DEBUG("ws -> {}", text);
   if (!sess->handle_frame(text))
     sess->shutdown_requested.store(true, std::memory_order_relaxed);
-  co_return;
 }
 
 net::awaitable<void> run_session(std::shared_ptr<ws_session> sess) {
+  // Tell any process_frame tasks still queued/running when this loop ends
+  // (break or exception, e.g. a read error from client disconnect) to skip
+  // their work. Note this can't interrupt work already in progress inside
+  // handle_frame, which has no cancellation checkpoints of its own — it
+  // only prevents *not-yet-started* frames from doing wasted work.
+  AUTO({
+    std::lock_guard lk{sess->cancel_mutex};
+    sess->cancel_sig.emit(net::cancellation_type::terminal);
+  });
   auto ex = co_await net::this_coro::executor;
   for (;;) {
     // FIXME: shutdown_requested is never observed while suspended in
@@ -83,11 +107,16 @@ net::awaitable<void> run_session(std::shared_ptr<ws_session> sess) {
     auto text = co_await sess->read_frame();
     net::post(
         ex, [text = std::move(text), sess, ex] () mutable {
+          net::cancellation_slot slot;
+          {
+            std::lock_guard lk{sess->cancel_mutex};
+            slot = sess->cancel_sig.slot();
+          }
           // sess is captured by value (shared_ptr) so the session outlives
           // this detached task even if run_session's loop has since ended.
           net::co_spawn(
               ex, process_frame(std::move(sess), std::move(text)),
-              net::detached);
+              net::bind_cancellation_slot(slot, net::detached));
         });
   }
   LOG_INFO("ws session ended");
