@@ -96,6 +96,13 @@ struct beast_ws_client : ws_client {
     }
     co_return out;
   }
+
+  void force_disconnect() override {
+    auto& socket = beast::get_lowest_layer(ws_).socket();
+    beast::error_code ec{};
+    socket.set_option(tcp::socket::linger{true, 0}, ec);
+    socket.close(ec);
+  }
 };
 
 net::awaitable<std::unique_ptr<ws_client>> connect_ws(int port) {

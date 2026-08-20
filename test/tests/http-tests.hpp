@@ -67,6 +67,11 @@ struct ws_client {
   virtual net::awaitable<json::object> recv_response() = 0;
   virtual net::awaitable<std::map<int64_t, json::object>> recv_n_responses(
       int n) = 0;
+
+  // Abruptly reset the underlying TCP connection (SO_LINGER{0} + close),
+  // rather than a graceful WebSocket/TCP shutdown, to simulate a dropped
+  // connection (e.g. a browser tab closing) as promptly as possible.
+  virtual void force_disconnect() = 0;
 };
 
 /// Connect to the WebSocket endpoint at /ws on the given port.

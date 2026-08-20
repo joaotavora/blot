@@ -3,7 +3,10 @@
 #include <doctest/doctest.h>
 
 #include <boost/asio/io_context.hpp>
+#include <boost/asio/steady_timer.hpp>
 #include <boost/asio/thread_pool.hpp>
+#include <boost/asio/use_awaitable.hpp>
+#include <chrono>
 #include <cstdint>
 #include <string>
 #include <string_view>
@@ -157,6 +160,55 @@ TEST_CASE_FIXTURE(http_fixture, "server_ws_concurrent_grab_asm") {
   // Must have observed at least 2 handlers in flight simultaneously;
   // anything less means the server serialized them.
   CHECK(testing::inflight_high_water() >= 2);
+}
+
+// Regression test for the ws_session use-after-free confirmed under ASan:
+// a client dropping its connection (e.g. closing a browser tab) can make
+// run_session's read loop end — and destroy the session — while an earlier
+// frame (grab_asm's real compiler invocation) is still running on a
+// thread-pool thread. If the session were kept alive only by the read
+// loop's raw pointer, ending the loop would free it out from under the
+// in-flight handler, which then use-after-frees it when it tries to send
+// the reply. Under an ASan build this aborts the whole test binary; with
+// the fix (shared ownership of the session) the handler simply finishes
+// against a session whose socket write silently fails.
+//
+// Detecting a reset connection is itself asynchronous and not perfectly
+// deterministic, so this repeats the disconnect-during-grab_asm attempt a
+// number of times — pre-fix, any single iteration hitting the race aborts
+// the whole test binary; post-fix, none of them can.
+TEST_CASE_FIXTURE(http_fixture, "server_ws_disconnect_during_grab_asm_no_uaf") {
+  run_ioc_test(ioc, [&]() -> net::awaitable<void> {
+    auto ex = co_await net::this_coro::executor;
+
+    for (int attempt = 0; attempt < 15; ++attempt) {
+      auto ws = co_await connect_ws(http_server.port);
+
+      co_await ws_send(ws.get(), 1, "initialize", {});
+      co_await ws->recv_response();
+
+      co_await ws_send(ws.get(), 2, "blot/infer", {{"file", "source.cpp"}});
+      auto infer_resp = co_await ws->recv_response();
+      REQUIRE(!infer_resp.contains("error"));
+      auto token = infer_resp.at("result").as_object().at("token").as_int64();
+
+      // Fire the slow request (a real compiler subprocess, dispatched as a
+      // detached task on the thread pool) but never read its response —
+      // instead reset the connection right away, out from under the server.
+      co_await ws_send(ws.get(), 3, "blot/grab_asm", {{"token", token}});
+      ws->force_disconnect();
+
+      // Give the still-running grab_asm handler time to finish. Pre-fix,
+      // an ASan build aborts the whole test binary somewhere in this
+      // window; post-fix, the handler just finishes normally.
+      net::steady_timer timer{ex};
+      for (int i = 0; i < 40 && testing::inflight_frames().load() > 0; ++i) {
+        timer.expires_after(std::chrono::milliseconds(10));
+        co_await timer.async_wait(net::use_awaitable);
+      }
+      CHECK(testing::inflight_frames().load() == 0);
+    }
+  }());
 }
 
 TEST_CASE_FIXTURE(http_fixture, "server_ws_grabasm_cache_token") {
