@@ -75,6 +75,36 @@ body {
   cursor: pointer;
 }
 
+.compile-flags-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  margin-bottom: 4px;
+}
+
+.compile-flags-label {
+  font-size: 11px;
+  color: #7080a0;
+  white-space: nowrap;
+}
+
+.compile-flags-input {
+  flex: 1;
+  background: #0d1520;
+  border: 1px solid #1e3a5f;
+  border-radius: 3px;
+  color: #a0c4ff;
+  font-family: monospace;
+  font-size: 11px;
+  padding: 2px 6px;
+  outline: none;
+}
+
+.compile-flags-input:focus {
+  border-color: #3a6aaf;
+}
+
 /* Main layout */
 .main {
   display: flex;
@@ -328,6 +358,11 @@ body {
     <span class="status-badge" v-if="status">{{ status.tu_count }} TUs &bull; {{ statusRoot }}</span>
     <span class="status-badge" style="color:#e94560" v-else-if="statusError">no compile_commands.json</span>
     <div class="options-bar">
+      <div class="compile-flags-row" v-if="compileFlags">
+        <span class="compile-flags-label">compile:</span>
+        <input class="compile-flags-input" type="text" v-model="compileFlags"
+               @change="reCompile" @keydown.enter.prevent="reCompile">
+      </div>
       <label class="opt-label" v-for="(val, key) in opts" :key="key">
         <input type="checkbox" v-model="opts[key]"> {{ optLabel(key) }}
       </label>
@@ -528,6 +563,8 @@ createApp({
       preserve_library_functions: false,
       preserve_unused_labels: false,
     });
+
+    const compileFlags = ref('');
 
     // Phase progress: {status: 'idle'|'running'|'done'|'cached'|'error', elapsed_ms}
     const phases = ref({
@@ -809,10 +846,13 @@ createApp({
       } finally { loadingSource.value = false; }
 
       const cached = fileCache.get(f);
-      if (cached?.asmToken != null)
+      if (cached?.asmToken != null) {
+        compileFlags.value = cached.compileCommand;
         reannotateWith(cached.asmToken, myGen);
-      else
+      } else {
+        compileFlags.value = '';
         runPipeline(f, myGen);
+      }
     }
 
     async function runPipeline(file, gen) {
@@ -827,11 +867,16 @@ createApp({
         // Phase 1: infer
         const inferRes = await blotWS.call('blot/infer', { file });
         if (gen !== pipelineGen) return;
+        compileFlags.value = inferRes.inference.compilation_command;
 
         // Phase 2: grab_asm
         const asmRes = await blotWS.call('blot/grab_asm', { token: inferRes.token });
         if (gen !== pipelineGen) return;
-        fileCache.set(file, { asmToken: asmRes.token });
+        fileCache.set(file, {
+          asmToken: asmRes.token,
+          compileCommand: compileFlags.value,
+          inferData: inferRes.inference,
+        });
         if (asmRes.compilation_command) {
           const ci = asmRes.compilation_command;
           compilerInfo.value = `${ci.compiler}  ${ci.compiler_version}`;
@@ -869,6 +914,52 @@ createApp({
         currentAnnotateReqId = annotateCall.reqId;
         const annRes = await annotateCall;
         if (gen !== pipelineGen) return;
+        asmLines.value = annRes.assembly || [];
+        lineMappings.value = annRes.line_mappings || [];
+      } catch (e) {
+        asmError.value = formatError(e);
+      } finally {
+        loadingAsm.value = false;
+      }
+    }
+
+    async function reCompile() {
+      if (!selectedFile.value || !blotWS || !compileFlags.value) return;
+      const cached = fileCache.get(selectedFile.value);
+      if (!cached?.inferData) return;
+      const myGen = ++pipelineGen;
+      loadingAsm.value = true;
+      asmError.value = '';
+      asmLines.value = [];
+      lineMappings.value = [];
+      compilerInfo.value = '';
+      phases.value.grabasm = { status: 'idle', elapsed_ms: null };
+      phases.value.annotate = { status: 'idle', elapsed_ms: null };
+      try {
+        const asmRes = await blotWS.call('blot/grab_asm', {
+          inference: {
+            compilation_command: compileFlags.value,
+            compilation_directory: cached.inferData.compilation_directory,
+            annotation_target: cached.inferData.annotation_target,
+          },
+        });
+        if (myGen !== pipelineGen) return;
+        fileCache.set(selectedFile.value, {
+          asmToken: asmRes.token,
+          compileCommand: compileFlags.value,
+          inferData: cached.inferData,
+        });
+        if (asmRes.compilation_command) {
+          const ci = asmRes.compilation_command;
+          compilerInfo.value = `${ci.compiler}  ${ci.compiler_version}`;
+        }
+        const annotateCall = blotWS.call('blot/annotate', {
+          token: asmRes.token,
+          options: opts.value,
+        });
+        currentAnnotateReqId = annotateCall.reqId;
+        const annRes = await annotateCall;
+        if (myGen !== pipelineGen) return;
         asmLines.value = annRes.assembly || [];
         lineMappings.value = annRes.line_mappings || [];
       } catch (e) {
@@ -920,11 +1011,11 @@ createApp({
       asmLines, lineMappings, loadingAsm, asmError, compilerInfo,
       asmPanel, asmVisibleHtml, asmOffset, asmPadTop, asmPadBot, onAsmScroll,
       hoveredSourceLine, hoveredAsmLine,
-      opts, phases,
+      opts, compileFlags, phases,
       srcRowClass, asmRowClass,
       clickSrcLine, clickAsmLine,
       basename, optLabel, phaseLabel,
-      selectFile, reannotate,
+      selectFile, reannotate, reCompile,
     };
   }
 }).mount('#app');
